@@ -1,0 +1,137 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UVTT v2 Manifest Schema",
+  "description": "Defines the global catalog, grid topology, hardware profiles, and encryption handshake guidelines.",
+  "type": "object",
+  "required": [
+    "format_version",
+    "uvtt_version",
+    "campaign_name",
+    "author",
+    "license"
+  ],
+  "properties": {
+    "format_version": {
+      "type": "string",
+      "enum": [
+        "2.0.0"
+      ]
+    },
+    "uvtt_version": {
+      "type": "string",
+      "enum": [
+        "2.0.0"
+      ]
+    },
+    "campaign_name": {
+      "type": "string",
+      "description": "The friendly title of the campaign or multi-floor dungeon package."
+    },
+    "author": {
+      "type": "string",
+      "description": "Metadata attributing authorship. Must not contain ungrounded or fabricated assertions."
+    },
+    "license": {
+      "type": "string",
+      "description": "Licensing type (e.g. CC0-1.0 or Apache-2.0)."
+    },
+    "hardware_profile": {
+      "type": "object",
+      "required": [
+        "minimum_pipeline",
+        "recommended_pipeline",
+        "requires_compute_shaders"
+      ],
+      "properties": {
+        "minimum_pipeline": {
+          "type": "string",
+          "enum": [
+            "webgl2",
+            "webgpu"
+          ]
+        },
+        "recommended_pipeline": {
+          "type": "string",
+          "enum": [
+            "webgl2",
+            "webgpu"
+          ]
+        },
+        "requires_compute_shaders": {
+          "type": "boolean"
+        }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Additive vendor-specific extensions to guarantee backward compatibility.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "encryption_handshake": {
+      "type": "object",
+      "required": [
+        "clearinghouse_url",
+        "license_authority",
+        "key_salt_checksum"
+      ],
+      "properties": {
+        "clearinghouse_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "The endpoint URL of the serverless edge clearinghouse."
+        },
+        "license_authority": {
+          "type": "string",
+          "format": "uri",
+          "description": "The JWKS endpoint used to verify user JWT signatures."
+        },
+        "key_salt_checksum": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{32}$",
+          "description": "A 32-character hexadecimal salt representation."
+        }
+      }
+    },
+    "map_catalog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "path",
+          "z_index"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "z_index": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

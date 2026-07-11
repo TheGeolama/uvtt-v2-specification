@@ -1,0 +1,453 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UVTT v2 Geometry Schema",
+  "description": "Defines vector path geometry, SVG Bezier nodes, vertical heights, normal directions, and overhead roofs.",
+  "type": "object",
+  "required": [
+    "format_version",
+    "resolution",
+    "geometry"
+  ],
+  "properties": {
+    "format_version": {
+      "type": "string",
+      "enum": [
+        "2.0.0"
+      ]
+    },
+    "resolution": {
+      "type": "object",
+      "required": [
+        "map_origin",
+        "grid_size",
+        "units_per_grid",
+        "unit_name",
+        "topology"
+      ],
+      "properties": {
+        "map_origin": {
+          "type": "object",
+          "required": [
+            "x",
+            "y"
+          ],
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          }
+        },
+        "grid_size": {
+          "type": "object",
+          "required": [
+            "x",
+            "y"
+          ],
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          }
+        },
+        "units_per_grid": {
+          "type": "number"
+        },
+        "unit_name": {
+          "type": "string"
+        },
+        "topology": {
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "square",
+                "hex",
+                "isometric"
+              ]
+            },
+            "orientation": {
+              "type": "string",
+              "enum": [
+                "flat_top",
+                "pointy_top"
+              ]
+            },
+            "offset": {
+              "type": "string",
+              "enum": [
+                "odd_row",
+                "even_row",
+                "odd_col",
+                "even_col"
+              ]
+            },
+            "isometric_ratio": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "required": [
+        "walls",
+        "portals"
+      ],
+      "properties": {
+        "walls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "type",
+              "height",
+              "path"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "standard",
+                  "terrain",
+                  "illusory"
+                ]
+              },
+              "height": {
+                "type": "object",
+                "required": [
+                  "bottom",
+                  "top"
+                ],
+                "properties": {
+                  "bottom": {
+                    "type": "number"
+                  },
+                  "top": {
+                    "type": "number"
+                  }
+                }
+              },
+              "blocks": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "light",
+                    "sight",
+                    "movement"
+                  ]
+                }
+              },
+              "path": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "type"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "move",
+                        "line",
+                        "bezier"
+                      ]
+                    },
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    },
+                    "cp1": {
+                      "type": "object",
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "cp2": {
+                      "type": "object",
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "to": {
+                      "type": "object",
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "directional_blocks": {
+                "type": "object",
+                "required": [
+                  "left_to_right",
+                  "right_to_left"
+                ],
+                "properties": {
+                  "left_to_right": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "light",
+                        "sight",
+                        "movement"
+                      ]
+                    }
+                  },
+                  "right_to_left": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "light",
+                        "sight",
+                        "movement"
+                      ]
+                    }
+                  }
+                }
+              },
+              "states": {
+                "type": "object",
+                "properties": {
+                  "ethereal": {
+                    "type": "boolean"
+                  },
+                  "disbelieved_by": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "portals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "type",
+              "state",
+              "height",
+              "blocks",
+              "line"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "door"
+                ]
+              },
+              "sub_type": {
+                "type": "string",
+                "enum": [
+                  "standard",
+                  "secret"
+                ]
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "closed"
+                ]
+              },
+              "height": {
+                "type": "object",
+                "required": [
+                  "bottom",
+                  "top"
+                ],
+                "properties": {
+                  "bottom": {
+                    "type": "number"
+                  },
+                  "top": {
+                    "type": "number"
+                  }
+                }
+              },
+              "blocks": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "light",
+                    "sight",
+                    "movement"
+                  ]
+                }
+              },
+              "line": {
+                "type": "object",
+                "required": [
+                  "p1",
+                  "p2"
+                ],
+                "properties": {
+                  "p1": {
+                    "type": "object",
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "p2": {
+                    "type": "object",
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "overhead": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "type",
+              "height",
+              "polygon",
+              "image"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "roof"
+                ]
+              },
+              "height": {
+                "type": "object",
+                "required": [
+                  "bottom",
+                  "top"
+                ],
+                "properties": {
+                  "bottom": {
+                    "type": "number"
+                  },
+                  "top": {
+                    "type": "number"
+                  }
+                }
+              },
+              "polygon": {
+                "type": "array",
+                "minItems": 3,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "x",
+                    "y"
+                  ],
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    }
+                  }
+                }
+              },
+              "image": {
+                "type": "object",
+                "required": [
+                  "uri"
+                ],
+                "properties": {
+                  "uri": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

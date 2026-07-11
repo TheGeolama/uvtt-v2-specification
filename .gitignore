@@ -1,0 +1,95 @@
+# ==========================================
+# UVTT v2 Specification Workspace .gitignore
+# ==========================================
+
+# ------------------------------------------
+# Cryptographic Keys & Environment Variables (CRITICAL)
+# ------------------------------------------
+# Never commit your master secrets, active tokens, or server keys [1, 3].
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.cert
+*.pub
+# Cloudflare Workers local secret bindings
+.dev.vars
+
+# ------------------------------------------
+# Compiled Tabletop Archives & Output Assets
+# ------------------------------------------
+# Prevent committing large binary maps, testing assets, or compiled game packages [2, 4].
+*.uvtt2z
+*.zip
+*.tar.gz
+*.rar
+*.7z
+# Ignore unencrypted test imagery layers or media cache directories
+assets/protected/
+protected/
+temp_output/
+*.webp
+*.png
+*.jpg
+*.jpeg
+*.ogg
+*.mp3
+
+# ------------------------------------------
+# Python (Test Suite / Compilation Scripts)
+# ------------------------------------------
+# Clean up Python runtime files from the testing suite.
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+ENV/
+env/
+
+# ------------------------------------------
+# Node.js & Svelte Web App (Upgrader Front-End)
+# ------------------------------------------
+# Keeps web dependencies and builds out of Git history.
+node_modules/
+dist/
+.svelte-kit/
+.vercel/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ------------------------------------------
+# Cloudflare Workers (DRM Clearinghouse Deployment)
+# ------------------------------------------
+# Wrangler development cache.
+.wrangler/
+
+# ------------------------------------------
+# Go (Clearinghouse Backend Reference Code)
+# ------------------------------------------
+# Ignore Go binaries and local database files [1, 5].
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.db
+*.sqlite
+
+# ------------------------------------------
+# IDEs and System Garbage Files
+# ------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

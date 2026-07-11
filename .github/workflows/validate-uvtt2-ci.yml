@@ -1,0 +1,65 @@
+name: UVTT v2 Conformance Verification
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-conformance:
+    name: Validate .uvtt2z Packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch history to resolve modified files on pull request
+
+      - name: Setup Go Runtime
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Compile Conformance Validator
+        run: |
+          go build -o uvtt2-validator .github/validators/validate_conformance.go
+
+      - name: Identify Modified UVTT Archives
+        id: files
+        run: |
+          # If it's a pull request, compare with merge-base. Otherwise, check last push.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --name-only --diff-filter=AM origin/${{ github.base_ref }}...HEAD | grep -E '\.(uvtt2z|gvtt)$' > changed_files.txt || true
+          else
+            git diff --name-only --diff-filter=AM HEAD~1 HEAD | grep -E '\.(uvtt2z|gvtt)$' > changed_files.txt || true
+          fi
+          
+          if [ -s changed_files.txt ]; then
+            echo "found_files=true" >> $GITHUB_OUTPUT
+            echo "📦 Files queued for verification:"
+            cat changed_files.txt
+          else
+            echo "found_files=false" >> $GITHUB_OUTPUT
+            echo "✨ No new or modified UVTT v2 archives found in this commit."
+          fi
+
+      - name: Run Conformance Suite
+        if: steps.files.outputs.found_files == 'true'
+        run: |
+          success=true
+          while IFS= read -r file; do
+            echo "--------------------------------------------------------"
+            echo "🚀 Verifying Package: $file"
+            if ! ./uvtt2-validator -file "$file"; then
+              echo "❌ Verification Failed: $file violates the UVTT v2 specification."
+              success=false
+            fi
+          done < changed_files.txt
+
+          if [ "$success" = false ]; then
+            echo "⚠️ CI Build Blocked: Conformance failures detected on incoming assets."
+            exit 1
+          fi
+          echo "🎉 All checked assets conform fully to the UVTT v2 specification."
