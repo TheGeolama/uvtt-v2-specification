@@ -4,6 +4,19 @@ All notable changes to the Universal VTT (UVTT) specification will be documented
 
 ---
 
+## [2.0.0-rc2] - 2026-07-11
+
+### 🚀 Added (Evolutionary Leap to PixiJS v8 & WebGPU Baseline)
+*   **PixiJS v8 Upgrade Integration:** Officially migrated the standard client-side reference and upgrader engines from WebGL2-bound PixiJS v7 to **PixiJS v8**, establishing the native **WebGPU** pipeline as our first-class hardware execution target [uvtt-v2-drm-export-bundle.md].
+*   **Asynchronous Scene Initialization:** Rewrote client-side bootstrap standards to use PixiJS v8’s async initialization (`await app.init()`) and unified drawing canvas buffers (`app.canvas` replacing `app.view`).
+*   **First-Class WebGPU Hardware Profiles:** Enforced the `hardware_profile.recommended_pipeline: "webgpu"` schema definition to natively feed unencrypted vector arrays directly into GPU compute and geometry registers [uvtt-v2-drm-export-bundle.md].
+*   **Decoupled Scene and Stroke Styles:** Refactored vector drawing code templates to match the new PixiJS v8 Graphics system, where shapes are drawn as pure structural nodes (`graphics.circle()`, `graphics.poly()`) and subsequently filled or stroked asynchronously (`fill()`, `stroke()`), dramatically optimizing batch draw-calls.
+
+### 🧹 Fixed (Technical Alignments)
+*   **Z-Fighting and Render Overlap Patches:** Standardized explicit layering inside WebGL/WebGPU Containers to isolate background textures, vector lines, lighting rings, and interactive selection joints, completely resolving collision rendering overlaps during real-time zoom calculations.
+
+---
+
 ## [2.0.0-rc1] - 2026-07-11
 
 ### 🚀 Added (Evolutionary Leap from v1 Legacy Formats)

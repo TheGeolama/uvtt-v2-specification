@@ -11,11 +11,17 @@ Reference parsers (such as our standard Go ingest engine `uvtt2_parser.go` and G
 
 ### 2. Strict Memory Isolation Protocols
 When drafting client-side Javascript, WebGL, or WebGPU code, contributors MUST strictly adhere to the **Volatile Memory Disposal Protocol**:
-* All decrypted premium raster bytes MUST reside in volatile, isolated CPU RAM or GPU VRAM blocks only.
-* Never leave un-revoked object references in browser DOM contexts. If utilizing transient `Blob` objects or `ImageBitmap` decoders, developers must trigger immediate cleanups (`URL.revokeObjectURL(blobUrl)` or `imageBitmap.close()`) immediately following GPU texture binding.
-* ArrayBuffers carrying decrypted content MUST be actively overwritten (i.e. `uint8View.fill(0)`) to sanitize the system memory footprint before releasing variables.
+* All decrypted premium raster bytes MUST reside in volatile, isolated CPU RAM or GPU VRAM blocks only [uvtt-v2-drm-export-bundle.md].
+* Never leave un-revoked object references in browser DOM contexts [uvtt-v2-drm-export-bundle.md]. If utilizing transient `Blob` objects or `ImageBitmap` decoders, developers must trigger immediate cleanups (`URL.revokeObjectURL(blobUrl)` or `imageBitmap.close()`) immediately following GPU texture binding [uvtt-v2-drm-export-bundle.md].
+* ArrayBuffers carrying decrypted content MUST be actively overwritten (i.e. `uint8View.fill(0)`) to sanitize the system memory footprint before releasing variables [uvtt-v2-drm-export-bundle.md].
 
-### 3. Mathematical Safety Boundaries
+### 3. PixiJS v8 Client Rendering Standards
+To support hardware-accelerated WebGPU rendering, any updated client-side HUD components (like `CanvasWorkspace.svelte`) must strictly use **PixiJS v8** standards:
+* **Asynchronous App Instantiation**: Always use `await app.init()` for Application startups, mounting `app.canvas` (replacing the legacy `app.view`).
+* **Decoupled Geometry & Style**: Always separate line path generation from raster fills and strokes (e.g. `graphics.circle(x, y, r).fill({ color })` or `graphics.poly(coords).stroke({ width })`).
+* **Interactive Fills Requirement**: Under WebGL/WebGPU renderers, line strokes cannot reliably register mouse hover or pointer-tap events. To build clickable vector nodes, you MUST use filled circular shapes (`graphics.circle().fill()`) at path midpoints and joints.
+
+### 4. Mathematical Safety Boundaries
 All rendering offsets, audio algorithms, and physics curves must be calculated defensively:
 * **Audio Decay:** Localized acoustic zone linear dampening calculations MUST mathematically clamp volume limits to prevent negative bounds or engine crashes:
   $$V = \max\left(0, \min\left(V_{\text{max}}, V_{\text{max}} \times \left(1 - \frac{d}{r}\right)\right)\right)$$
@@ -41,7 +47,7 @@ The UVTT v2 specification is a **Living Document**. To propose additive features
 
 ## 🔒 The Backward-Compatibility Contract
 
-Core features (such as standard walls, doors, windows, default landing zones, and coordinate mappings) are **immutable**. 
+Core features (such as standard walls, portals, default landing zones, and coordinate mappings) are **immutable**. 
 * Any new capabilities or platform-specific extensions MUST be added strictly inside the optional `extensions` block in the global `manifest.json`.
 * Parsing engines must gracefully ignore unrecognized keys inside the extensions container, preventing legacy software from throwing syntax or runtime crash warnings.
 
