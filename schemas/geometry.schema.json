@@ -1,99 +1,65 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "UVTT v2 Geometry Schema",
-  "description": "Defines vector path geometry, SVG Bezier nodes, vertical heights, normal directions, and overhead roofs.",
+  "title": "UVTT v2 Material Geometry Schema (geometry.schema.json)",
+  "description": "Validation rules for structural geometry, grid scaling, walls, portals, and overhead layers.",
   "type": "object",
-  "required": [
-    "format_version",
-    "resolution",
-    "geometry"
-  ],
+  "required": ["format_version", "resolution", "geometry"],
+  "additionalProperties": false,
   "properties": {
     "format_version": {
       "type": "string",
-      "enum": [
-        "2.0.0"
-      ]
+      "enum": ["2.0.0"]
     },
     "resolution": {
       "type": "object",
-      "required": [
-        "map_origin",
-        "grid_size",
-        "units_per_grid",
-        "unit_name",
-        "topology"
-      ],
+      "required": ["map_origin", "grid_size", "units_per_grid", "unit_name", "topology"],
+      "additionalProperties": false,
       "properties": {
         "map_origin": {
           "type": "object",
-          "required": [
-            "x",
-            "y"
-          ],
+          "required": ["x", "y"],
+          "additionalProperties": false,
           "properties": {
-            "x": {
-              "type": "number"
-            },
-            "y": {
-              "type": "number"
-            }
+            "x": { "type": "number" },
+            "y": { "type": "number" }
           }
         },
         "grid_size": {
           "type": "object",
-          "required": [
-            "x",
-            "y"
-          ],
+          "required": ["x", "y"],
+          "additionalProperties": false,
           "properties": {
-            "x": {
-              "type": "number"
-            },
-            "y": {
-              "type": "number"
-            }
+            "x": { "type": "number" },
+            "y": { "type": "number" }
           }
         },
         "units_per_grid": {
-          "type": "number"
+          "type": "number",
+          "minimum": 0.1
         },
         "unit_name": {
           "type": "string"
         },
         "topology": {
           "type": "object",
-          "required": [
-            "type"
-          ],
+          "required": ["type"],
+          "additionalProperties": false,
           "properties": {
             "type": {
               "type": "string",
-              "enum": [
-                "square",
-                "hex",
-                "isometric"
-              ]
+              "enum": ["square", "hex", "isometric"]
             },
             "orientation": {
               "type": "string",
-              "enum": [
-                "flat_top",
-                "pointy_top"
-              ]
+              "enum": ["flat_top", "pointy_top"]
             },
             "offset": {
               "type": "string",
-              "enum": [
-                "odd_row",
-                "even_row",
-                "odd_col",
-                "even_col"
-              ]
+              "enum": ["odd_row", "even_row", "odd_col", "even_col"]
             },
             "isometric_ratio": {
               "type": "number",
-              "minimum": 0.0,
+              "minimum": 0.1,
               "maximum": 1.0
             }
           }
@@ -102,125 +68,65 @@
     },
     "geometry": {
       "type": "object",
-      "required": [
-        "walls",
-        "portals"
-      ],
+      "required": ["walls", "portals", "overhead"],
+      "additionalProperties": false,
       "properties": {
         "walls": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "id",
-              "type",
-              "height",
-              "path"
-            ],
+            "required": ["id", "type", "height", "path"],
+            "additionalProperties": false,
             "properties": {
-              "id": {
-                "type": "string"
-              },
+              "id": { "type": "string" },
               "type": {
                 "type": "string",
-                "enum": [
-                  "standard",
-                  "terrain",
-                  "illusory"
-                ]
+                "enum": ["standard", "terrain", "invisible", "illusory"]
               },
               "height": {
                 "type": "object",
-                "required": [
-                  "bottom",
-                  "top"
-                ],
+                "required": ["bottom", "top"],
+                "additionalProperties": false,
                 "properties": {
-                  "bottom": {
-                    "type": "number"
-                  },
-                  "top": {
-                    "type": "number"
-                  }
-                }
-              },
-              "blocks": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "enum": [
-                    "light",
-                    "sight",
-                    "movement"
-                  ]
+                  "bottom": { "type": "number" },
+                  "top": { "type": "number" }
                 }
               },
               "path": {
                 "type": "array",
-                "minItems": 1,
+                "minItems": 2,
                 "items": {
                   "type": "object",
-                  "required": [
-                    "type"
-                  ],
+                  "required": ["type"],
                   "properties": {
                     "type": {
                       "type": "string",
-                      "enum": [
-                        "move",
-                        "line",
-                        "bezier"
-                      ]
+                      "enum": ["move", "line", "bezier"]
                     },
-                    "x": {
-                      "type": "number"
-                    },
-                    "y": {
-                      "type": "number"
-                    },
+                    "x": { "type": "number" },
+                    "y": { "type": "number" },
                     "cp1": {
                       "type": "object",
-                      "required": [
-                        "x",
-                        "y"
-                      ],
+                      "required": ["x", "y"],
                       "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        }
+                        "x": { "type": "number" },
+                        "y": { "type": "number" }
                       }
                     },
                     "cp2": {
                       "type": "object",
-                      "required": [
-                        "x",
-                        "y"
-                      ],
+                      "required": ["x", "y"],
                       "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        }
+                        "x": { "type": "number" },
+                        "y": { "type": "number" }
                       }
                     },
                     "to": {
                       "type": "object",
-                      "required": [
-                        "x",
-                        "y"
-                      ],
+                      "required": ["x", "y"],
                       "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        }
+                        "x": { "type": "number" },
+                        "y": { "type": "number" }
                       }
                     }
                   }
@@ -228,46 +134,26 @@
               },
               "directional_blocks": {
                 "type": "object",
-                "required": [
-                  "left_to_right",
-                  "right_to_left"
-                ],
+                "additionalProperties": false,
                 "properties": {
                   "left_to_right": {
                     "type": "array",
-                    "items": {
-                      "type": "string",
-                      "enum": [
-                        "light",
-                        "sight",
-                        "movement"
-                      ]
-                    }
+                    "items": { "type": "string", "enum": ["light", "sight", "movement"] }
                   },
                   "right_to_left": {
                     "type": "array",
-                    "items": {
-                      "type": "string",
-                      "enum": [
-                        "light",
-                        "sight",
-                        "movement"
-                      ]
-                    }
+                    "items": { "type": "string", "enum": ["light", "sight", "movement"] }
                   }
                 }
               },
               "states": {
                 "type": "object",
+                "additionalProperties": false,
                 "properties": {
-                  "ethereal": {
-                    "type": "boolean"
-                  },
+                  "ethereal": { "type": "boolean" },
                   "disbelieved_by": {
                     "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
+                    "items": { "type": "string" }
                   }
                 }
               }
@@ -278,99 +164,54 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "id",
-              "type",
-              "state",
-              "height",
-              "blocks",
-              "line"
-            ],
+            "required": ["id", "type", "sub_type", "state", "height", "blocks", "line"],
+            "additionalProperties": false,
             "properties": {
-              "id": {
-                "type": "string"
-              },
+              "id": { "type": "string" },
               "type": {
                 "type": "string",
-                "enum": [
-                  "door"
-                ]
+                "enum": ["door", "window", "secret"]
               },
               "sub_type": {
                 "type": "string",
-                "enum": [
-                  "standard",
-                  "secret"
-                ]
+                "enum": ["standard", "sliding", "secret"]
               },
               "state": {
                 "type": "string",
-                "enum": [
-                  "open",
-                  "closed"
-                ]
+                "enum": ["open", "closed", "locked"]
               },
               "height": {
                 "type": "object",
-                "required": [
-                  "bottom",
-                  "top"
-                ],
+                "required": ["bottom", "top"],
+                "additionalProperties": false,
                 "properties": {
-                  "bottom": {
-                    "type": "number"
-                  },
-                  "top": {
-                    "type": "number"
-                  }
+                  "bottom": { "type": "number" },
+                  "top": { "type": "number" }
                 }
               },
               "blocks": {
                 "type": "array",
-                "items": {
-                  "type": "string",
-                  "enum": [
-                    "light",
-                    "sight",
-                    "movement"
-                  ]
-                }
+                "items": { "type": "string", "enum": ["light", "sight", "movement"] }
               },
               "line": {
                 "type": "object",
-                "required": [
-                  "p1",
-                  "p2"
-                ],
+                "required": ["p1", "p2"],
+                "additionalProperties": false,
                 "properties": {
                   "p1": {
                     "type": "object",
-                    "required": [
-                      "x",
-                      "y"
-                    ],
+                    "required": ["x", "y"],
                     "properties": {
-                      "x": {
-                        "type": "number"
-                      },
-                      "y": {
-                        "type": "number"
-                      }
+                      "x": { "type": "number" },
+                      "y": { "type": "number" }
                     }
                   },
                   "p2": {
                     "type": "object",
-                    "required": [
-                      "x",
-                      "y"
-                    ],
+                    "required": ["x", "y"],
                     "properties": {
-                      "x": {
-                        "type": "number"
-                      },
-                      "y": {
-                        "type": "number"
-                      }
+                      "x": { "type": "number" },
+                      "y": { "type": "number" }
                     }
                   }
                 }
@@ -382,36 +223,21 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "id",
-              "type",
-              "height",
-              "polygon",
-              "image"
-            ],
+            "required": ["id", "type", "height", "polygon", "image"],
+            "additionalProperties": false,
             "properties": {
-              "id": {
-                "type": "string"
-              },
+              "id": { "type": "string" },
               "type": {
                 "type": "string",
-                "enum": [
-                  "roof"
-                ]
+                "enum": ["roof", "canopy"]
               },
               "height": {
                 "type": "object",
-                "required": [
-                  "bottom",
-                  "top"
-                ],
+                "required": ["bottom", "top"],
+                "additionalProperties": false,
                 "properties": {
-                  "bottom": {
-                    "type": "number"
-                  },
-                  "top": {
-                    "type": "number"
-                  }
+                  "bottom": { "type": "number" },
+                  "top": { "type": "number" }
                 }
               },
               "polygon": {
@@ -419,29 +245,19 @@
                 "minItems": 3,
                 "items": {
                   "type": "object",
-                  "required": [
-                    "x",
-                    "y"
-                  ],
+                  "required": ["x", "y"],
                   "properties": {
-                    "x": {
-                      "type": "number"
-                    },
-                    "y": {
-                      "type": "number"
-                    }
+                    "x": { "type": "number" },
+                    "y": { "type": "number" }
                   }
                 }
               },
               "image": {
                 "type": "object",
-                "required": [
-                  "uri"
-                ],
+                "required": ["uri"],
+                "additionalProperties": false,
                 "properties": {
-                  "uri": {
-                    "type": "string"
-                  }
+                  "uri": { "type": "string" }
                 }
               }
             }

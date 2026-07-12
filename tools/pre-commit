@@ -1,0 +1,53 @@
+#!/bin/bash
+# ======================================================================
+#             UVTT v2 Workspace - Git Pre-Commit Hook
+# ======================================================================
+# Audits schemas, verticalities, and tests before allowing commits.
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+echo -e "${BLUE}${BOLD}======================================================================${NC}"
+echo -e "${BLUE}${BOLD}               UVTT v2 Pre-Commit Conformance Guard                   ${NC}"
+echo -e "${BLUE}${BOLD}======================================================================${NC}"
+
+if ! command -v python3 &>/dev/null; then
+    echo -e "${RED}[-] ERROR:${NC} Python 3 is required to run workspace validation tests."
+    exit 1
+fi
+
+echo -e "${BLUE}[*] Auditing Draft-07 JSON Schemas...${NC}"
+python3 -c "
+import sys
+import json
+from jsonschema import Draft7Validator
+
+schemas = ['schemas/manifest.schema.json', 'schemas/geometry.schema.json', 'schemas/entities.schema.json']
+for schema_path in schemas:
+    try:
+        with open(schema_path, 'r') as f:
+            schema_data = json.load(f)
+        Draft7Validator.check_schema(schema_data)
+        print(f'  [PASS] {schema_path} complies with Draft-07 meta-schema.')
+    except Exception as e:
+        print(f'  [FAIL] {schema_path} structural check failed: {str(e)}', file=sys.stderr)
+        sys.exit(1)
+"
+if [ $? -ne 0 ]; then
+    echo -e "${RED}[-] SCHEMA VALIDATION FAILURE: Check definitions before committing.${NC}"
+    exit 1
+fi
+
+echo -e "${BLUE}[*] Running Master Conformance Test Suite...${NC}"
+python3 tests/master-test-suite.py
+if [ $? -ne 0 ]; then
+    echo -e "${RED}[-] CONFORMANCE FAILURE: Fix layout issues before committing.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}${BOLD}[+] SUCCESS: All checks passed. Proceeding with commit.${NC}"
+exit 0

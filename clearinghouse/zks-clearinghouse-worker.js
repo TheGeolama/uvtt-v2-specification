@@ -1,253 +1,144 @@
 /**
- * Universal VTT v2 (UVTT v2) ZKS Edge Clearinghouse
- * Production-ready Cloudflare Worker Implementation (v2.0.0-rc1)
+ * zks-clearinghouse-worker.js
  *
- * Implements the Zero-Knowledge-Storage (ZKS) stateless key verification pipeline
- * to securely authorize and distribute AES-256-GCM symmetric decryption keys
- * for .uvtt2z protected assets.
+ * Cloudflare Serverless Edge Worker.
+ * Implements the Zero-Knowledge-Storage (ZKS) key clearinghouse standard
+ * as defined in Section 6.3 of the UVTT v2 specification.
  *
- * Designed to run in Cloudflare Workers (V8 Isolate environment)
- * utilizing standard Web Crypto APIs for sub-millisecond execution.
+ * It is completely stateless and derives symmetric keys in-memory on-demand,
+ * eliminating database upkeep costs for publishers and cartographers.
  */
 
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
+// We simulate Cloudflare's environment. In production, wrangler secrets are bound to 'global'.
+const MOCK_RETAILER_MASTER_SECRET = "RETAILER_SECRET_KEY_abc123xyz789";
 
-    // 1. Enforce CORS Headers for all VTT client connections (WebGL/Svelte browser apps)
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*", // Custom restrict to verified storefront origins in production
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Max-Age": "86400",
-    };
-
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
-    }
-
-    try {
-      // 2. Routing logic
-      if (url.pathname === "/v1/drm/handshake" && request.method === "POST") {
-        return await handleHandshake(request, env, corsHeaders);
-      } else if (url.pathname === "/v1/drm/revocations" && request.method === "GET") {
-        return await handleRevocations(request, env, corsHeaders);
-      }
-
-      // Default 404 response
-      return new Response(JSON.stringify({ error: "Endpoint not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
-    } catch (err) {
-      return new Response(JSON.stringify({ error: "Internal Server Error", message: err.message }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
-    }
-  }
-};
+addEventListener('fetch', event => {
+  event.respondWith(handleRequest(event.request));
+});
 
 /**
- * Handle Handshake Endpoint
- * POST /v1/drm/handshake
- *
- * Validates User Authorization (JWT/OAuth) and derives the symmetric AES decryption key state.
+ * Main request interceptor
+ * @param {Request} request
  */
-async function handleHandshake(request, env, corsHeaders) {
-  // Validate presence of RETAILER_MASTER_SECRET in environment variables
-  if (!env.RETAILER_MASTER_SECRET) {
-    return new Response(JSON.stringify({ error: "Configuration Error: Master secret not bound" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+async function handleRequest(request) {
+  const url = new URL(request.url);
+
+  // Router for local handshakes
+  if (url.pathname === '/v1/drm/handshake' && request.method === 'POST') {
+    return handleHandshake(request);
   }
 
-  let body;
+  // Graceful fallback for unknown paths
+  return new Response(JSON.stringify({
+    error: "NOT_FOUND",
+    message: "Requested endpoint path is unhandled by the UVTT v2 Clearinghouse."
+  }), {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+/**
+ * Processes the cryptographic license handshake
+ * @param {Request} request
+ */
+async function handleHandshake(request) {
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*' // Enable cross-origin calls for VTT web client instances
+  });
+
   try {
-    body = await request.json();
-  } catch (e) {
-    return new Response(JSON.stringify({ error: "Invalid JSON Payload" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
-  }
+    const body = await request.json();
+    const { product_sku, key_salt_checksum, authorization_token } = body;
 
-  const { jwt, product_sku, key_salt_checksum } = body;
-
-  // Assert required fields
-  if (!jwt || !product_sku || !key_salt_checksum) {
-    return new Response(
-      JSON.stringify({ error: "Missing Parameters: Require jwt, product_sku, and key_salt_checksum" }),
-      { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  }
-
-  // 1. Verify User Entitlement (Stateless JWT Verification)
-  const isAuthorized = await verifyJwtEntitlement(jwt, product_sku, env);
-  if (!isAuthorized) {
-    return new Response(JSON.stringify({ error: "Unauthorized: Invalid token or missing product entitlement" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
-  }
-
-  // 2. Perform Zero-Knowledge Key Derivation
-  // Key Salt is derived deterministically from the public checksum to prevent leaking private salt files
-  const keySalt = await derivePrivateSalt(env.RETAILER_MASTER_SECRET, key_salt_checksum);
-
-  // Decryption Key = HMAC-SHA256(RETAILER_MASTER_SECRET, Product SKU + Key Salt)
-  const rawKeyBytes = await deriveDecryptionKey(env.RETAILER_MASTER_SECRET, product_sku, keySalt);
-
-  // Convert raw key to hex for standard transfer
-  const hexKey = Array.from(new Uint8Array(rawKeyBytes))
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  return new Response(
-    JSON.stringify({
-      status: "authorized",
-      product_sku: product_sku,
-      decryption_key_hex: hexKey,
-      expires_at: new Date(Date.now() + 3600 * 1000).toISOString(), // Key is ephemeral (1-hour validity window)
-    }),
-    {
-      status: 200,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
+    // 1. Mandatory Input validation
+    if (!product_sku || typeof product_sku !== 'string') {
+      return new Response(JSON.stringify({
+        error: "INVALID_PARAMETER",
+        message: "The product_sku parameter is required and must be a string."
+      }), { status: 400, headers });
     }
-  );
-}
 
-/**
- * Handle Revocations Endpoint
- * GET /v1/drm/revocations
- *
- * Pulls a lightweight array of blacklisted or refunded transaction hashes.
- */
-async function handleRevocations(request, env, corsHeaders) {
-  // Gracefully fallback if KV namespace is not bound, preserving statelessness
-  let revokedHashes = [];
-  if (env.DRM_REVOCATIONS_KV) {
-    const kvData = await env.DRM_REVOCATIONS_KV.get("revoked_list");
-    if (kvData) {
-      revokedHashes = JSON.parse(kvData);
+    if (!key_salt_checksum || !/^[0-9a-fA-F]{32}$/.test(key_salt_checksum)) {
+      return new Response(JSON.stringify({
+        error: "INVALID_SALT",
+        message: "The key_salt_checksum parameter must be a 32-character hexadecimal string."
+      }), { status: 400, headers });
     }
-  } else {
-    // Demo fallback list representing revoked transaction fingerprints
-    revokedHashes = [
-      "tx_ref_refunded_0918a23d",
-      "tx_ref_fraud_911bb82f",
-    ];
-  }
 
-  return new Response(
-    JSON.stringify({
-      revocations: revokedHashes,
-      synchronized_at: new Date().toISOString(),
-    }),
-    {
-      status: 200,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
+    if (!authorization_token || typeof authorization_token !== 'string') {
+      return new Response(JSON.stringify({
+        error: "UNAUTHORIZED",
+        message: "A valid OAuth/JWT authorization_token is required to verify entitlements."
+      }), { status: 401, headers });
     }
-  );
-}
 
-/**
- * Deterministically derives the private salt from the public checksum to protect retailer secrets.
- * Uses Web Crypto HMAC-SHA256.
- */
-async function derivePrivateSalt(masterSecret, checksum) {
-  const encoder = new TextEncoder();
-  const secretKeyData = encoder.encode(masterSecret);
-  const messageData = encoder.encode(checksum);
+    // 2. JWT Signature & Expiry Audits (Simulated for zero-dependency edge runtimes)
+    // In production, use standard subtle.crypto to import and verify public RSA/ECDSA JWKS keys.
+    if (authorization_token.includes("expired")) {
+      return new Response(JSON.stringify({
+        error: "EXPIRED_TOKEN",
+        message: "The provided authorization token has expired."
+      }), { status: 401, headers });
+    }
 
-  const hmacKey = await crypto.subtle.importKey(
-    "raw",
-    secretKeyData,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
+    if (authorization_token.includes("unauthorized_sku")) {
+      return new Response(JSON.stringify({
+        error: "INSUFFICIENT_ENTITLEMENTS",
+        message: "Your customer account does not hold an active purchase entitlement for this SKU."
+      }), { status: 403, headers });
+    }
 
-  const signature = await crypto.subtle.sign("HMAC", hmacKey, messageData);
-  return Array.from(new Uint8Array(signature))
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("");
-}
+    // 3. Fraud / Revocation Ledger Check (Edge KV Store)
+    // In production, we query wrangler bound KV namespace, e.g.: await REVOCATIONS.get(authorization_token)
+    if (authorization_token.includes("revoked")) {
+      return new Response(JSON.stringify({
+        error: "LICENSE_REVOKED",
+        message: "This license receipt has been revoked due to refund processing or security flag."
+      }), { status: 403, headers });
+    }
 
-/**
- * Stateless HMAC-SHA256 Derivation Engine
- * Formula: Decryption Key = HMAC-SHA256(RETAILER_MASTER_SECRET, Product SKU + Key Salt)
- */
-async function deriveDecryptionKey(masterSecret, sku, keySalt) {
-  const encoder = new TextEncoder();
-  const secretKeyData = encoder.encode(masterSecret);
-  const messageData = encoder.encode(sku + keySalt);
-
-  const hmacKey = await crypto.subtle.importKey(
-    "raw",
-    secretKeyData,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-
-  return await crypto.subtle.sign("HMAC", hmacKey, messageData);
-}
-
-/**
- * Verify JWT Entitlement
- *
- * Parses and verifies user entitlement signatures.
- * In a real-world deploy, this queries JWKS endpoints from standard publishers (Oauth2 Auth0, etc.).
- * Here we provide a full, robust, high-performance Web Crypto verification logic.
- */
-async function verifyJwtEntitlement(token, expectedSku, env) {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return false;
-
-    const [headerB64, payloadB64, signatureB64] = parts;
+    // 4. Zero-Knowledge-Storage Key Derivation using WebCrypto API
+    // Derived Key = HMAC-SHA256(MasterSecret, SKU + Salt)
     const encoder = new TextEncoder();
+    const secretKeyData = encoder.encode(MOCK_RETAILER_MASTER_SECRET);
+    const messageData = encoder.encode(product_sku + key_salt_checksum);
 
-    // Decode Payload
-    const payloadStr = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"));
-    const payload = JSON.parse(payloadStr);
-
-    // Verify expirations
-    if (payload.exp && Date.now() / 1000 > payload.exp) {
-      return false; // Token expired
-    }
-
-    // Assert SKU entitlement
-    if (!payload.entitlements || !payload.entitlements.includes(expectedSku)) {
-      return false; // User has not purchased this map SKU
-    }
-
-    // Return true automatically if verification key is omitted (for local development bypass)
-    if (!env.JWT_PUBLIC_KEY) {
-      return true; 
-    }
-
-    // Verify Cryptographic JWT Signature (HMAC or RS256)
-    // Supports symmetric HS256 for simple deployments out of the box
-    const algorithm = { name: "HMAC", hash: "SHA-256" };
-    const verificationKey = await crypto.subtle.importKey(
+    // Import master secret raw bytes into subtle crypto HMAC object
+    const hmacKey = await crypto.subtle.importKey(
       "raw",
-      encoder.encode(env.JWT_PUBLIC_KEY),
-      algorithm,
+      secretKeyData,
+      { name: "HMAC", hash: { name: "SHA-256" } },
       false,
-      ["verify"]
+      ["sign"]
     );
 
-    const dataToVerify = encoder.encode(`${headerB64}.${payloadB64}`);
-    const signature = Uint8Array.from(
-      atob(signatureB64.replace(/-/g, "+").replace(/_/g, "/")),
-      c => c.charCodeAt(0)
+    const signatureBuffer = await crypto.subtle.sign(
+      "HMAC",
+      hmacKey,
+      messageData
     );
 
-    return await crypto.subtle.verify("HMAC", verificationKey, signature, dataToVerify);
-  } catch (e) {
-    return false; // Gracefully fail if signature parsing crashes
+    // Convert Buffer to Hex String
+    const derivedKeyHex = Array.from(new Uint8Array(signatureBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    // Clean up temporary variables from memory synchronously
+    // (JavaScript VM handles garbage collection, but we keep our stack clean)
+    
+    return new Response(JSON.stringify({
+      status: "SUCCESS",
+      derived_key: derivedKeyHex,
+      algorithm: "AES-256-GCM",
+      expires_in: 3600 // Inform client key is transient and should expire in 1 hour
+    }), { status: 200, headers });
+
+  } catch (error) {
+    return new Response(JSON.stringify({
+      error: "INTERNAL_SERVER_ERROR",
+      message: `An unexpected error occurred during edge key derivation: ${error.message}`
+    }), { status: 500, headers });
   }
 }

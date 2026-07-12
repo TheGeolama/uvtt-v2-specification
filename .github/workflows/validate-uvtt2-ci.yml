@@ -1,65 +1,60 @@
-name: UVTT v2 Conformance Verification
+name: UVTT v2 Core Schema & Conformance CI
 
 on:
   push:
     branches: [ main, dev ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, dev ]
+
+permissions:
+  contents: read
 
 jobs:
-  validate-conformance:
-    name: Validate .uvtt2z Packages
+  validate-schemas-and-conformance:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Codebase
+      - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
         with:
-          fetch-depth: 0 # Fetch history to resolve modified files on pull request
+          python-version: '3.12'
 
-      - name: Setup Go Runtime
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-
-      - name: Compile Conformance Validator
+      - name: Install Validation Dependencies
         run: |
-          go build -o uvtt2-validator .github/validators/validate_conformance.go
+          python -m pip install --upgrade pip
+          pip install jsonschema cryptography PyJWT
 
-      - name: Identify Modified UVTT Archives
-        id: files
+      - name: Step 1 - Validate Schema Draft-07 Structural Validity
         run: |
-          # If it's a pull request, compare with merge-base. Otherwise, check last push.
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git diff --name-only --diff-filter=AM origin/${{ github.base_ref }}...HEAD | grep -E '\.(uvtt2z|gvtt)$' > changed_files.txt || true
-          else
-            git diff --name-only --diff-filter=AM HEAD~1 HEAD | grep -E '\.(uvtt2z|gvtt)$' > changed_files.txt || true
-          fi
+          echo "=== Auditing UVTT v2 Draft-07 JSON Schemas ==="
+          python -c "
+          import json
+          from jsonschema import Draft7Validator
           
-          if [ -s changed_files.txt ]; then
-            echo "found_files=true" >> $GITHUB_OUTPUT
-            echo "📦 Files queued for verification:"
-            cat changed_files.txt
-          else
-            echo "found_files=false" >> $GITHUB_OUTPUT
-            echo "✨ No new or modified UVTT v2 archives found in this commit."
-          fi
+          schemas = ['schemas/manifest.schema.json', 'schemas/geometry.schema.json', 'schemas/entities.schema.json']
+          for schema_path in schemas:
+              print(f'Validating schema structure: {schema_path}')
+              with open(schema_path, 'r') as f:
+                  schema_data = json.load(f)
+              Draft7Validator.check_schema(schema_data)
+          print('SUCCESS: All JSON schemas are syntactically valid Draft-07 meta-schemas!')
+          "
 
-      - name: Run Conformance Suite
-        if: steps.files.outputs.found_files == 'true'
+      - name: Step 2 - Execute Master Conformance Test Suite
         run: |
-          success=true
-          while IFS= read -r file; do
-            echo "--------------------------------------------------------"
-            echo "🚀 Verifying Package: $file"
-            if ! ./uvtt2-validator -file "$file"; then
-              echo "❌ Verification Failed: $file violates the UVTT v2 specification."
-              success=false
-            fi
-          done < changed_files.txt
+          echo "=== Executing Consolidated Conformance Verification Engine ==="
+          python tests/master-test-suite.py
 
-          if [ "$success" = false ]; then
-            echo "⚠️ CI Build Blocked: Conformance failures detected on incoming assets."
-            exit 1
+      - name: Step 3 - Verify Go Reference Parser Compilation
+        run: |
+          echo "=== Auditing Go Reference Parser Compilation ==="
+          if [ -d "reference-parsers/go/" ]; then
+            cd reference-parsers/go/
+            go env -w GO111MODULE=auto
+            go build -v uvtt2_parser.go
+          else
+            echo "Go directory not found, skipping."
           fi
-          echo "🎉 All checked assets conform fully to the UVTT v2 specification."

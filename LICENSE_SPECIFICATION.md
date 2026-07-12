@@ -1,0 +1,19 @@
+# MIT License — UVTT v2 Specification
+
+**Copyright (c) 2026 The UVTT v2 Project Contributors**
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---
+
+### 💡 Developer & Platform Integration Note (Non-Normative)
+
+To assist tabletop platform developers, cartographers, and tool authors integrating this specification (including Foundry VTT, Roll20, Dungeondraft, etc.):
+
+1. **Permitted Bundling:** You are explicitly permitted and encouraged to bundle the official schemas (`manifest.schema.json`, `geometry.schema.json`, `entities.schema.json`) and the official reference parsers (TypeScript/Go) directly into your commercial, open-source, or private virtual tabletop (VTT) applications.
+2. **Redistribution:** You may modify the reference implementations to fit your platform's specific architectural needs (such as adapting the Web Crypto DRM routines, collinear simplification math, or the wind-vector inheritance engine) and redistribute those modifications under the same MIT permissions.
+3. **Trademark Usage:** While the software layouts and schemas are open, please refer to the standard as **Universal Virtual Tabletop v2 (UVTT v2)** to maintain format cohesion and prevent market fragmentation.

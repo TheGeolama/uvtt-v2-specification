@@ -1,0 +1,26 @@
+name: Sync Repository Labels
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/labels.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Run GitHub Label Sync
+        uses: crazy-max/ghaction-github-labeler@v5
+        with:
+          yaml-file: .github/labels.yml
+          skip-delete: false # Set to true if you want to preserve default GitHub labels
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
