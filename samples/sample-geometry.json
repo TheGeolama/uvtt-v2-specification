@@ -1,0 +1,92 @@
+{
+  "format_version": "2.0.0",
+  "resolution": {
+    "map_origin": { "x": 0.0, "y": 0.0 },
+    "grid_size": { "x": 70.0, "y": 70.0 },
+    "units_per_grid": 5.0,
+    "unit_name": "ft",
+    "topology": {
+      "type": "hex",
+      "orientation": "pointy_top",
+      "offset": "odd_row"
+    }
+  },
+  "geometry": {
+    "walls": [
+      {
+        "id": "wall_curved_corridor",
+        "type": "standard",
+        "height": { "bottom": 0.0, "top": 10.0 },
+        "path": [
+          { "type": "move", "x": 10.0, "y": 5.0 },
+          {
+            "type": "bezier",
+            "cp1": { "x": 15.0, "y": 5.0 },
+            "cp2": { "x": 20.0, "y": 10.0 },
+            "to": { "x": 25.0, "y": 15.0 }
+          }
+        ]
+      },
+      {
+        "id": "wall_one_way_ledge",
+        "type": "standard",
+        "height": { "bottom": 0.0, "top": 4.5 },
+        "path": [
+          { "type": "move", "x": 5.0, "y": 10.0 },
+          { "type": "line", "x": 15.0, "y": 10.0 }
+        ],
+        "directional_blocks": {
+          "left_to_right": ["movement"],
+          "right_to_left": []
+        }
+      },
+      {
+        "id": "wall_illusory_stone",
+        "type": "illusory",
+        "height": { "bottom": 0.0, "top": 10.0 },
+        "path": [
+          { "type": "move", "x": 20.0, "y": 30.0 },
+          { "type": "line", "x": 30.0, "y": 30.0 }
+        ],
+        "directional_blocks": {
+          "left_to_right": ["light", "sight", "movement"],
+          "right_to_left": ["light", "sight", "movement"]
+        },
+        "states": {
+          "ethereal": false,
+          "disbelieved_by": ["player-token-02"]
+        }
+      }
+    ],
+    "portals": [
+      {
+        "id": "door_secret_treasury",
+        "type": "door",
+        "sub_type": "secret",
+        "state": "closed",
+        "height": { "bottom": 0.0, "top": 10.0 },
+        "blocks": ["light", "sight", "movement"],
+        "line": {
+          "p1": { "x": 12.0, "y": 30.0 },
+          "p2": { "x": 15.5, "y": 30.0 }
+        }
+      }
+    ],
+    "overhead": [
+      {
+        "id": "roof_wizard_spire",
+        "type": "roof",
+        "height": { "bottom": 12.0, "top": 35.0 },
+        "polygon": [
+          { "x": 40.0, "y": 40.0 },
+          { "x": 60.0, "y": 40.0 },
+          { "x": 60.0, "y": 60.0 },
+          { "x": 40.0, "y": 60.0 }
+        ],
+        "image": {
+          "uri": "assets/spire_roof.webp"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "format_version": "2.0.0",
+  "uvtt_version": "2.0.0",
+  "campaign_name": "Ghul's Labyrinth - Level 01",
+  "author": "TheGeolama",
+  "license": "CC-BY-NC-4.0",
+  "hardware_profile": {
+    "minimum_pipeline": "webgl2",
+    "recommended_pipeline": "webgpu",
+    "requires_compute_shaders": false
+  },
+  "encryption_handshake": {
+    "clearinghouse_url": "https://licensing.retailer.com/v1/drm/handshake",
+    "license_authority": "https://auth.retailer.com/.well-known/jwks.json",
+    "key_salt_checksum": "a4d39f772b15e45a1f298cd310ba2dfc"
+  },
+  "environment": {
+    "global_wind": {
+      "speed": 5.0,
+      "angle": 45.0,
+      "gust_variance": 0.15
+    }
+  },
+  "audio": {
+    "music": {
+      "uri": "assets/global_combat_theme.ogg",
+      "volume": 0.75,
+      "crossfade_duration": 3.0
+    },
+    "ambience": {
+      "uri": "assets/global_storm_loop.ogg",
+      "volume": 0.40
+    }
+  },
+  "map_catalog": [
+    {
+      "id": "ghuls-labyrinth-lvl1",
+      "name": "Upper Labyrinth",
+      "slug": "upper-labyrinth",
+      "path": "maps/upper_labyrinth/",
+      "z_index": 0
+    }
+  ]
+}

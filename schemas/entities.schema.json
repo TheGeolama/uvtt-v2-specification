@@ -1,98 +1,104 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "UVTT v2 Interactive Entities Schema (entities.schema.json)",
-  "description": "JSON Schema validating interactive layers in Universal VTT v2 including lights, landing zones, events, ambient audio zones, and atmospheric weather/particle emitters.",
+  "title": "UVTT v2 Entities Schema",
+  "description": "Defines interactive components including 3D lighting, landing zones, teleportation scripts, weather systems, and 3-tier audio layers.",
   "type": "object",
-  "additionalProperties": false,
   "properties": {
-    "format_version": {
-      "type": "string",
-      "enum": ["2.0.0"]
-    },
     "lights": {
       "type": "array",
-      "description": "An array of dynamic 3D-aware light sources.",
       "items": {
         "type": "object",
-        "required": ["id", "type", "position", "color", "bright_radius", "dim_radius", "decay"],
-        "additionalProperties": false,
+        "required": [
+          "id",
+          "type",
+          "position",
+          "color",
+          "bright_radius",
+          "dim_radius",
+          "decay"
+        ],
         "properties": {
           "id": {
-            "type": "string",
-            "description": "Unique identifier for this light source."
+            "type": "string"
           },
           "type": {
             "type": "string",
-            "enum": ["point", "directional"],
-            "description": "Point casts light 360 degrees. Directional limits illumination to a sector cone."
+            "enum": [
+              "point",
+              "directional"
+            ]
           },
           "position": {
             "type": "object",
-            "required": ["x", "y", "z"],
-            "additionalProperties": false,
+            "required": [
+              "x",
+              "y",
+              "z"
+            ],
             "properties": {
-              "x": { "type": "number" },
-              "y": { "type": "number" },
-              "z": { "type": "number", "description": "3D height position of the light source relative to the floor plane." }
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "z": {
+                "type": "number"
+              }
             }
           },
           "color": {
             "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$",
-            "description": "6-character hex code (#RRGGBB) or 8-character hex code with alpha (#RRGGBBAA)."
+            "pattern": "^#[a-fA-F0-9]{6}$"
           },
           "bright_radius": {
-            "type": "number",
-            "minimum": 0.0,
-            "description": "Radius of bright light in physical units (e.g. feet/meters)."
+            "type": "number"
           },
           "dim_radius": {
-            "type": "number",
-            "minimum": 0.0,
-            "description": "Total radius of illumination (dim light begins where bright light ends)."
+            "type": "number"
           },
           "decay": {
             "type": "string",
-            "enum": ["linear", "inverse_square"],
-            "description": "Mathematical decay model. Inverse-square models physical light attenuation."
+            "enum": [
+              "linear",
+              "inverse_square"
+            ]
           },
           "cone": {
             "type": "object",
-            "required": ["rotation", "arc"],
-            "additionalProperties": false,
+            "required": [
+              "rotation",
+              "arc"
+            ],
             "properties": {
               "rotation": {
-                "type": "number",
-                "minimum": 0.0,
-                "maximum": 360.0,
-                "description": "The center direction of the cone beam in degrees."
+                "type": "number"
               },
               "arc": {
-                "type": "number",
-                "minimum": 1.0,
-                "maximum": 360.0,
-                "description": "The angular width of the beam in degrees (e.g. 60.0 for a bullseye lantern)."
+                "type": "number"
               }
             }
           },
           "animation": {
             "type": "object",
-            "required": ["type", "speed", "intensity_variance"],
-            "additionalProperties": false,
+            "required": [
+              "type",
+              "speed",
+              "intensity_variance"
+            ],
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["flicker", "pulse"]
+                "enum": [
+                  "flicker",
+                  "pulse"
+                ]
               },
               "speed": {
-                "type": "number",
-                "minimum": 0.0
+                "type": "number"
               },
               "intensity_variance": {
-                "type": "number",
-                "minimum": 0.0,
-                "maximum": 1.0,
-                "description": "Flicker/pulse depth ratio (0.0 = static, 1.0 = full amplitude)."
+                "type": "number"
               }
             }
           }
@@ -101,11 +107,15 @@
     },
     "landing_zones": {
       "type": "array",
-      "description": "Explicit player token starting positions or camera anchors.",
       "items": {
         "type": "object",
-        "required": ["id", "name", "is_default", "coordinates", "heading_degrees"],
-        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "is_default",
+          "coordinates",
+          "heading_degrees"
+        ],
         "properties": {
           "id": {
             "type": "string"
@@ -114,28 +124,28 @@
             "type": "string"
           },
           "is_default": {
-            "type": "boolean",
-            "description": "If true, this is the main starting zone. Exactly one is_default=true is permitted per map."
+            "type": "boolean"
           },
           "coordinates": {
             "type": "array",
             "minItems": 2,
             "maxItems": 2,
-            "items": { "type": "number" },
-            "description": "[X, Y] absolute coordinate array of the landing zone."
+            "items": {
+              "type": "number"
+            }
           },
           "heading_degrees": {
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 360.0,
-            "description": "Compass direction players face upon arrival."
+            "type": "number"
           },
           "properties": {
             "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "description": { "type": "string" },
-              "camera_zoom_level": { "type": "number", "minimum": 0.1 }
+              "description": {
+                "type": "string"
+              },
+              "camera_zoom_level": {
+                "type": "number"
+              }
             }
           }
         }
@@ -143,88 +153,159 @@
     },
     "events": {
       "type": "array",
-      "description": "Interactive triggers such as traps, teleporters, stairs, or pitfalls.",
       "items": {
         "type": "object",
-        "required": ["id", "type", "trigger_bounds"],
-        "additionalProperties": false,
+        "required": [
+          "id",
+          "type",
+          "trigger_bounds",
+          "conditions",
+          "destination"
+        ],
         "properties": {
-          "id": { "type": "string" },
+          "id": {
+            "type": "string"
+          },
           "type": {
             "type": "string",
-            "enum": ["teleport", "trap"]
+            "enum": [
+              "teleport",
+              "trap"
+            ]
           },
           "trigger_bounds": {
             "type": "object",
-            "required": ["shape"],
-            "additionalProperties": false,
+            "required": [
+              "shape"
+            ],
             "properties": {
               "shape": {
                 "type": "string",
-                "enum": ["polygon", "circle"]
+                "enum": [
+                  "polygon",
+                  "circle"
+                ]
               },
               "points": {
                 "type": "array",
-                "minItems": 3,
                 "items": {
                   "type": "object",
-                  "required": ["x", "y"],
-                  "additionalProperties": false,
+                  "required": [
+                    "x",
+                    "y"
+                  ],
                   "properties": {
-                    "x": { "type": "number" },
-                    "y": { "type": "number" }
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    }
                   }
                 }
               },
               "center": {
                 "type": "object",
-                "required": ["x", "y"],
-                "additionalProperties": false,
+                "required": [
+                  "x",
+                  "y"
+                ],
                 "properties": {
-                  "x": { "type": "number" },
-                  "y": { "type": "number" }
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
                 }
               },
               "radius": {
-                "type": "number",
-                "minimum": 0.0
+                "type": "number"
               }
             }
           },
           "conditions": {
             "type": "object",
-            "additionalProperties": false,
             "properties": {
-              "requires_interaction": { "type": "boolean" },
-              "interaction_key": { "type": "string" },
+              "requires_interaction": {
+                "type": "boolean"
+              },
+              "interaction_key": {
+                "type": "string"
+              },
               "allowed_modes": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                }
               },
-              "is_active": { "type": "boolean" },
-              "key_item_required": { "type": "string" }
+              "is_active": {
+                "type": "boolean"
+              },
+              "key_item_required": {
+                "type": "string"
+              }
             }
           },
           "destination": {
             "type": "object",
-            "additionalProperties": false,
+            "required": [
+              "type",
+              "uri"
+            ],
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["intra_map", "inter_map"]
+                "enum": [
+                  "intra_map",
+                  "inter_map"
+                ]
               },
               "uri": {
                 "type": "string",
-                "description": "Standardized URI target: internal://{map_slug} or relative://{package_file}."
+                "description": "Unified URI using internal:// (compound) or relative:// (federated) routing targets."
               },
               "fade_transition": {
                 "type": "string",
-                "enum": ["crossfade_black", "planar_flash"]
+                "enum": [
+                  "crossfade_black",
+                  "planar_flash"
+                ]
               },
               "prediction_trigger_radius": {
                 "type": "number",
-                "minimum": 0.0,
-                "description": "Proximity radius in grid units to pre-fetch target assets before transition executes."
+                "description": "Trigger buffer threshold in grids to pre-slice tiles."
+              }
+            }
+          },
+          "portal_dependency": {
+            "type": "object",
+            "description": "Optional dependency on a physical portal state (e.g., a door or trapdoor) to enable/gate this event.",
+            "required": [
+              "portal_id",
+              "allowed_states"
+            ],
+            "properties": {
+              "portal_id": {
+                "type": "string",
+                "description": "The unique ID of the target portal from geometry.json."
+              },
+              "allowed_states": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "open",
+                    "closed",
+                    "broken",
+                    "locked"
+                  ]
+                },
+                "description": "The list of portal states that allow this trigger to fire."
+              },
+              "lock_feedback_message": {
+                "type": "string",
+                "description": "The message displayed to GMs or players if they attempt to trigger this event while the portal is closed."
               }
             }
           }
@@ -233,62 +314,99 @@
     },
     "audio": {
       "type": "object",
-      "required": ["zones"],
-      "additionalProperties": false,
       "properties": {
+        "music": {
+          "type": "object",
+          "required": [
+            "uri",
+            "volume"
+          ],
+          "properties": {
+            "uri": {
+              "type": "string"
+            },
+            "volume": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "crossfade_duration": {
+              "type": "number"
+            }
+          }
+        },
+        "ambience": {
+          "type": "object",
+          "required": [
+            "uri",
+            "volume"
+          ],
+          "properties": {
+            "uri": {
+              "type": "string"
+            },
+            "volume": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        },
         "zones": {
           "type": "array",
-          "description": "Localized, proximity-based acoustic zones.",
           "items": {
             "type": "object",
-            "required": ["id", "shape", "fade_radius", "volume_max", "audio_uri"],
-            "additionalProperties": false,
+            "required": [
+              "id",
+              "shape",
+              "radius",
+              "fade_radius",
+              "volume_max",
+              "audio_uri"
+            ],
             "properties": {
-              "id": { "type": "string" },
+              "id": {
+                "type": "string"
+              },
               "shape": {
                 "type": "string",
-                "enum": ["circle", "polygon"]
+                "enum": [
+                  "circle",
+                  "polygon"
+                ]
               },
               "center": {
                 "type": "object",
-                "required": ["x", "y"],
-                "additionalProperties": false,
+                "required": [
+                  "x",
+                  "y"
+                ],
                 "properties": {
-                  "x": { "type": "number" },
-                  "y": { "type": "number" }
-                }
-              },
-              "radius": {
-                "type": "number",
-                "minimum": 0.0
-              },
-              "points": {
-                "type": "array",
-                "minItems": 3,
-                "items": {
-                  "type": "object",
-                  "required": ["x", "y"],
-                  "additionalProperties": false,
-                  "properties": {
-                    "x": { "type": "number" },
-                    "y": { "type": "number" }
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
                   }
                 }
               },
+              "radius": {
+                "type": "number"
+              },
               "fade_radius": {
-                "type": "number",
-                "minimum": 0.0,
-                "description": "Buffer distance beyond boundary where linear falloff attenuation begins."
+                "type": "number"
               },
               "volume_max": {
                 "type": "number",
                 "minimum": 0.0,
-                "maximum": 1.0,
-                "description": "Maximum playback volume at or inside boundaries."
+                "maximum": 1.0
               },
               "audio_uri": {
-                "type": "string",
-                "description": "Local URI reference inside assets/ subdirectory."
+                "type": "string"
+              },
+              "muffled_by_geometry": {
+                "type": "boolean",
+                "description": "If true, the VTT applies acoustic raycasting to muffle sound through walls and portals."
               }
             }
           }
@@ -297,113 +415,96 @@
     },
     "emitters": {
       "type": "array",
-      "description": "Atmospheric weather or magic particle emitter zones.",
       "items": {
         "type": "object",
-        "required": ["id", "type", "bounds", "properties"],
-        "additionalProperties": false,
+        "required": [
+          "id",
+          "type",
+          "properties"
+        ],
         "properties": {
           "id": {
-            "type": "string",
-            "description": "Unique identifier for this particle emitter."
+            "type": "string"
           },
           "type": {
             "type": "string",
-            "enum": ["rain", "snow", "fog", "embers", "magic"],
-            "description": "Particle type preset. Drives shaders and physics parameters."
+            "enum": [
+              "rain",
+              "snow",
+              "fog",
+              "embers",
+              "magic"
+            ]
+          },
+          "is_global": {
+            "type": "boolean",
+            "description": "If true, the emitter affects the entire map and the bounds parameter is optional."
           },
           "bounds": {
             "type": "object",
-            "required": ["shape"],
-            "additionalProperties": false,
+            "required": [
+              "shape"
+            ],
             "properties": {
               "shape": {
                 "type": "string",
-                "enum": ["polygon", "circle"]
+                "enum": [
+                  "polygon",
+                  "circle"
+                ]
               },
               "points": {
                 "type": "array",
-                "minItems": 3,
                 "items": {
                   "type": "object",
-                  "required": ["x", "y"],
-                  "additionalProperties": false,
+                  "required": [
+                    "x",
+                    "y"
+                  ],
                   "properties": {
-                    "x": { "type": "number" },
-                    "y": { "type": "number" }
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    }
                   }
                 }
-              },
-              "center": {
-                "type": "object",
-                "required": ["x", "y"],
-                "additionalProperties": false,
-                "properties": {
-                  "x": { "type": "number" },
-                  "y": { "type": "number" }
-                }
-              },
-              "radius": {
-                "type": "number",
-                "minimum": 0.0
               }
-            }
-          },
-          "height": {
-            "type": "object",
-            "required": ["bottom", "top"],
-            "additionalProperties": false,
-            "properties": {
-              "bottom": { "type": "number" },
-              "top": { "type": "number" }
             }
           },
           "properties": {
             "type": "object",
-            "required": ["intensity", "speed", "angle", "color", "collision_mode", "wind_influence"],
-            "additionalProperties": false,
+            "required": [
+              "intensity",
+              "speed",
+              "angle",
+              "color"
+            ],
             "properties": {
               "intensity": {
                 "type": "number",
                 "minimum": 0.0,
-                "maximum": 1.0,
-                "description": "Scale of particle density/emission rates."
+                "maximum": 1.0
               },
               "speed": {
-                "type": "number",
-                "minimum": 0.0,
-                "description": "Velocity scale of particles."
+                "type": "number"
               },
               "angle": {
-                "type": "number",
-                "minimum": 0.0,
-                "maximum": 360.0,
-                "description": "Drift direction in degrees (0.0 = straight down, 90.0 = blowing right)."
+                "type": "number"
               },
               "color": {
                 "type": "string",
-                "pattern": "^#[0-9a-fA-F]{6}$",
-                "description": "6-character hexadecimal color tint overlay (#RRGGBB)."
+                "pattern": "^#[a-fA-F0-9]{6}$"
               },
-              "collision_mode": {
+              "render_layer": {
                 "type": "string",
-                "enum": ["none", "mask_under_overhead", "ground_terminate", "wall_bounce"],
-                "description": "Collision/masking behavior of emitted particles."
-              },
-              "wind_influence": {
-                "type": "object",
-                "required": ["inherit_global", "influence_scale"],
-                "additionalProperties": false,
-                "properties": {
-                  "inherit_global": {
-                    "type": "boolean"
-                  },
-                  "influence_scale": {
-                    "type": "number",
-                    "minimum": 0.0,
-                    "maximum": 2.0
-                  }
-                }
+                "enum": [
+                  "above_overhead",
+                  "below_overhead",
+                  "ground_level"
+                ],
+                "description": "Governs where particles sit in the visual Z-index rendering stack."
               }
             }
           }

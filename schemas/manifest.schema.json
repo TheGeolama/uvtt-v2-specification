@@ -1,141 +1,119 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "UVTT v2 Root Manifest Schema (manifest.schema.json)",
-  "description": "Validation rules for the root manifest.json inside a UVTT v2 package (.uvtt2z).",
+  "title": "UVTT v2 Manifest Schema",
+  "description": "Defines the global catalog, grid topology, hardware profiles, and encryption handshake guidelines.",
   "type": "object",
-  "required": ["format_version", "uvtt_version", "campaign_name", "map_catalog"],
-  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "uvtt_version",
+    "campaign_name",
+    "author",
+    "license"
+  ],
   "properties": {
     "format_version": {
       "type": "string",
-      "enum": ["2.0.0"]
+      "enum": [
+        "2.0.0"
+      ]
     },
     "uvtt_version": {
       "type": "string",
-      "enum": ["2.0.0"]
+      "enum": [
+        "2.0.0"
+      ]
     },
     "campaign_name": {
-      "type": "string"
+      "type": "string",
+      "description": "The friendly title of the campaign or multi-floor dungeon package."
     },
     "author": {
-      "type": "string"
+      "type": "string",
+      "description": "Metadata attributing authorship. Must not contain ungrounded or fabricated assertions."
     },
     "license": {
-      "type": "string"
+      "type": "string",
+      "description": "Licensing type (e.g. CC0-1.0 or Apache-2.0)."
     },
     "hardware_profile": {
       "type": "object",
-      "required": ["minimum_pipeline", "recommended_pipeline", "requires_compute_shaders"],
-      "additionalProperties": false,
+      "required": [
+        "minimum_pipeline",
+        "recommended_pipeline",
+        "requires_compute_shaders"
+      ],
       "properties": {
         "minimum_pipeline": {
           "type": "string",
-          "enum": ["webgl2", "webgpu"]
+          "enum": [
+            "webgl2",
+            "webgpu"
+          ]
         },
         "recommended_pipeline": {
           "type": "string",
-          "enum": ["webgl2", "webgpu"]
+          "enum": [
+            "webgl2",
+            "webgpu"
+          ]
         },
         "requires_compute_shaders": {
           "type": "boolean"
         }
       }
     },
+    "extensions": {
+      "type": "object",
+      "description": "Additive vendor-specific extensions to guarantee backward compatibility.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
     "encryption_handshake": {
       "type": "object",
-      "required": ["clearinghouse_url", "license_authority", "key_salt_checksum"],
-      "additionalProperties": false,
+      "required": [
+        "clearinghouse_url",
+        "license_authority",
+        "key_salt_checksum"
+      ],
       "properties": {
         "clearinghouse_url": {
           "type": "string",
-          "format": "uri"
+          "format": "uri",
+          "description": "The endpoint URL of the serverless edge clearinghouse."
         },
         "license_authority": {
           "type": "string",
-          "format": "uri"
+          "format": "uri",
+          "description": "The JWKS endpoint used to verify user JWT signatures."
         },
         "key_salt_checksum": {
           "type": "string",
-          "pattern": "^[0-9a-fA-F]{32}$",
-          "description": "32-character hex key salt checksum"
-        }
-      }
-    },
-    "environment": {
-      "type": "object",
-      "required": ["global_wind"],
-      "additionalProperties": false,
-      "properties": {
-        "global_wind": {
-          "type": "object",
-          "required": ["speed", "angle", "gust_variance"],
-          "additionalProperties": false,
-          "properties": {
-            "speed": {
-              "type": "number",
-              "minimum": 0.0
-            },
-            "angle": {
-              "type": "number",
-              "minimum": 0.0,
-              "maximum": 360.0
-            },
-            "gust_variance": {
-              "type": "number",
-              "minimum": 0.0,
-              "maximum": 1.0
-            }
-          }
-        }
-      }
-    },
-    "audio": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "music": {
-          "type": "object",
-          "required": ["uri", "volume"],
-          "additionalProperties": false,
-          "properties": {
-            "uri": {
-              "type": "string"
-            },
-            "volume": {
-              "type": "number",
-              "minimum": 0.0,
-              "maximum": 1.0
-            },
-            "crossfade_duration": {
-              "type": "number",
-              "minimum": 0.0
-            }
-          }
-        },
-        "ambience": {
-          "type": "object",
-          "required": ["uri", "volume"],
-          "additionalProperties": false,
-          "properties": {
-            "uri": {
-              "type": "string"
-            },
-            "volume": {
-              "type": "number",
-              "minimum": 0.0,
-              "maximum": 1.0
-            }
-          }
+          "pattern": "^[a-fA-F0-9]{32}$",
+          "description": "A 32-character hexadecimal salt representation."
         }
       }
     },
     "map_catalog": {
       "type": "array",
-      "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id", "name", "slug", "path", "z_index"],
-        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "path",
+          "z_index"
+        ],
         "properties": {
           "id": {
             "type": "string"
@@ -144,8 +122,7 @@
             "type": "string"
           },
           "slug": {
-            "type": "string",
-            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+            "type": "string"
           },
           "path": {
             "type": "string"

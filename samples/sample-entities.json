@@ -1,0 +1,130 @@
+{
+  "format_version": "2.0.0",
+  "lights": [
+    {
+      "id": "light_flickering_torch",
+      "type": "directional",
+      "position": { "x": 15.0, "y": 12.0, "z": 6.5 },
+      "color": "#f97316",
+      "bright_radius": 15.0,
+      "dim_radius": 30.0,
+      "decay": "inverse_square",
+      "cone": {
+        "rotation": 180.0,
+        "arc": 120.0
+      },
+      "animation": {
+        "type": "flicker",
+        "speed": 1.5,
+        "intensity_variance": 0.25
+      }
+    }
+  ],
+  "landing_zones": [
+    {
+      "id": "lz_surface_stair_arrival",
+      "name": "Stairwell Spawn",
+      "is_default": true,
+      "coordinates": [12.0, 14.5],
+      "heading_degrees": 90.0,
+      "properties": {
+        "description": "Arrival point descending from the castle ruins.",
+        "camera_zoom_level": 1.2
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "trigger_chasm_pitfall",
+      "type": "teleport",
+      "trigger_bounds": {
+        "shape": "polygon",
+        "points": [
+          { "x": 45.0, "y": 30.0 },
+          { "x": 47.0, "y": 30.0 },
+          { "x": 47.0, "y": 32.0 },
+          { "x": 45.0, "y": 32.0 }
+        ]
+      },
+      "conditions": {
+        "requires_interaction": false,
+        "allowed_modes": ["walking", "running"]
+      },
+      "destination": {
+        "type": "inter_map",
+        "uri": "relative://ghuls_labyrinth_lvl2.uvtt2z#lz_shaft_drop_landing",
+        "fade_transition": "crossfade_black",
+        "prediction_trigger_radius": 3.0
+      }
+    },
+    {
+      "id": "event_tavern_trapdoor_down",
+      "type": "teleport",
+      "trigger_bounds": {
+        "shape": "circle",
+        "center": { "x": 12.0, "y": 14.5 },
+        "radius": 1.5
+      },
+      "conditions": {
+        "requires_interaction": true,
+        "interaction_key": "use_ladder"
+      },
+      "destination": {
+        "type": "intra_map",
+        "uri": "internal://tavern_cellar#lz_cellar_staircase",
+        "prediction_trigger_radius": 2.5
+      },
+      "portal_dependency": {
+        "portal_id": "portal_trapdoor_ground_floor",
+        "allowed_states": ["open", "broken"],
+        "lock_feedback_message": "The heavy iron-bound trapdoor is firmly shut."
+      }
+    }
+  ],
+  "audio": {
+    "zones": [
+      {
+        "id": "acoustic_water_dripping",
+        "shape": "circle",
+        "center": { "x": 22.4, "y": 18.1 },
+        "radius": 4.0,
+        "fade_radius": 6.0,
+        "volume_max": 0.85,
+        "audio_uri": "assets/sfx_dripping_water.ogg",
+        "muffled_by_geometry": true
+      }
+    ]
+  },
+  "emitters": [
+    {
+      "id": "weather_blizzard_courtyard",
+      "type": "snow",
+      "is_global": false,
+      "bounds": {
+        "shape": "polygon",
+        "points": [
+          { "x": 0.0, "y": 0.0 },
+          { "x": 100.0, "y": 0.0 },
+          { "x": 100.0, "y": 100.0 },
+          { "x": 0.0, "y": 100.0 }
+        ]
+      },
+      "height": {
+        "bottom": 0.0,
+        "top": 40.0
+      },
+      "properties": {
+        "intensity": 0.80,
+        "speed": 4.5,
+        "angle": 135.0,
+        "color": "#ffffff",
+        "render_layer": "above_overhead",
+        "collision_mode": "mask_under_overhead",
+        "wind_influence": {
+          "inherit_global": true,
+          "influence_scale": 1.2
+        }
+      }
+    }
+  ]
+}
