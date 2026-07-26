@@ -277,37 +277,6 @@
                 "description": "Trigger buffer threshold in grids to pre-slice tiles."
               }
             }
-          },
-          "portal_dependency": {
-            "type": "object",
-            "description": "Optional dependency on a physical portal state (e.g., a door or trapdoor) to enable/gate this event.",
-            "required": [
-              "portal_id",
-              "allowed_states"
-            ],
-            "properties": {
-              "portal_id": {
-                "type": "string",
-                "description": "The unique ID of the target portal from geometry.json."
-              },
-              "allowed_states": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "enum": [
-                    "open",
-                    "closed",
-                    "broken",
-                    "locked"
-                  ]
-                },
-                "description": "The list of portal states that allow this trigger to fire."
-              },
-              "lock_feedback_message": {
-                "type": "string",
-                "description": "The message displayed to GMs or players if they attempt to trigger this event while the portal is closed."
-              }
-            }
           }
         }
       }
@@ -403,10 +372,6 @@
               },
               "audio_uri": {
                 "type": "string"
-              },
-              "muffled_by_geometry": {
-                "type": "boolean",
-                "description": "If true, the VTT applies acoustic raycasting to muffle sound through walls and portals."
               }
             }
           }
@@ -420,6 +385,7 @@
         "required": [
           "id",
           "type",
+          "bounds",
           "properties"
         ],
         "properties": {
@@ -435,10 +401,6 @@
               "embers",
               "magic"
             ]
-          },
-          "is_global": {
-            "type": "boolean",
-            "description": "If true, the emitter affects the entire map and the bounds parameter is optional."
           },
           "bounds": {
             "type": "object",
@@ -496,15 +458,6 @@
               "color": {
                 "type": "string",
                 "pattern": "^#[a-fA-F0-9]{6}$"
-              },
-              "render_layer": {
-                "type": "string",
-                "enum": [
-                  "above_overhead",
-                  "below_overhead",
-                  "ground_level"
-                ],
-                "description": "Governs where particles sit in the visual Z-index rendering stack."
               }
             }
           }

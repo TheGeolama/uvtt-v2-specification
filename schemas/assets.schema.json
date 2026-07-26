@@ -1,0 +1,277 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UVTT v2 Asset Manifest Schema",
+  "description": "Defines metadata registries, grid scaling, and automatic entity emissions for standalone UVTT asset archives (.uvtt2a).",
+  "type": "object",
+  "required": [
+    "format_version",
+    "package_type",
+    "pack_name",
+    "author",
+    "version"
+  ],
+  "properties": {
+    "format_version": {
+      "type": "string",
+      "enum": [
+        "2.0.0"
+      ]
+    },
+    "package_type": {
+      "type": "string",
+      "enum": [
+        "asset_pack"
+      ]
+    },
+    "pack_name": {
+      "type": "string"
+    },
+    "author": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "assets": {
+      "type": "object",
+      "properties": {
+        "audio": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "file",
+              "name",
+              "default_volume"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "default_volume": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0
+              },
+              "is_loop": {
+                "type": "boolean"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "tokens": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "file",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "grid_footprint": {
+                "type": "object",
+                "required": [
+                  "width_in_grids",
+                  "height_in_grids"
+                ],
+                "properties": {
+                  "width_in_grids": {
+                    "type": "number"
+                  },
+                  "height_in_grids": {
+                    "type": "number"
+                  }
+                }
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "props": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "file",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "default_scale": {
+                "type": "number",
+                "default": 100.0
+              },
+              "grid_footprint": {
+                "type": "object",
+                "required": [
+                  "width_in_grids",
+                  "height_in_grids"
+                ],
+                "properties": {
+                  "width_in_grids": {
+                    "type": "number"
+                  },
+                  "height_in_grids": {
+                    "type": "number"
+                  }
+                }
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "auto_emits": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "type"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "light",
+                        "audio",
+                        "emitter"
+                      ]
+                    },
+                    "color": {
+                      "type": "string",
+                      "pattern": "^#[a-fA-F0-9]{6}$"
+                    },
+                    "bright_radius": {
+                      "type": "number"
+                    },
+                    "dim_radius": {
+                      "type": "number"
+                    },
+                    "decay": {
+                      "type": "string",
+                      "enum": [
+                        "linear",
+                        "inverse_square"
+                      ]
+                    },
+                    "animation": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "speed",
+                        "intensity_variance"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "flicker",
+                            "pulse"
+                          ]
+                        },
+                        "speed": {
+                          "type": "number"
+                        },
+                        "intensity_variance": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "audio_uri": {
+                      "type": "string"
+                    },
+                    "volume_max": {
+                      "type": "number",
+                      "minimum": 0.0,
+                      "maximum": 1.0
+                    },
+                    "fade_radius": {
+                      "type": "number"
+                    },
+                    "muffled_by_geometry": {
+                      "type": "boolean"
+                    },
+                    "emitter_type": {
+                      "type": "string",
+                      "enum": [
+                        "rain",
+                        "snow",
+                        "fog",
+                        "embers",
+                        "magic"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "required": [
+                        "intensity",
+                        "speed",
+                        "angle",
+                        "color"
+                      ],
+                      "properties": {
+                        "intensity": {
+                          "type": "number",
+                          "minimum": 0.0,
+                          "maximum": 1.0
+                        },
+                        "speed": {
+                          "type": "number"
+                        },
+                        "angle": {
+                          "type": "number"
+                        },
+                        "color": {
+                          "type": "string",
+                          "pattern": "^#[a-fA-F0-9]{6}$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,45 +1,56 @@
-# UVTT v2 Storefront Re-Signing API Specification
-**Version:** 2.0.0-rc2  
-**Standard:** Universal VTT v2 (UVTT v2) DRM & Security Subsystem  
-**License:** Public Domain / Creative Commons CC0 1.0 Universal  
+# Storefront Re-Signing API Architecture & Blueprint
+**Specification Version: v2.0.0-rc2**
 
----
-
-## 1. Architectural Overview & Data Flow
-
-To support the **Split-Resolution Encryption Model** without vendor lock-in, online digital marketplaces (e.g., DriveThruRPG, Patreon, or custom storefronts) must deploy an automated server-side **Publisher Re-signing API**. 
+To securely implement the **Split-Resolution Encryption Model** without vendor lock-in, online digital marketplaces (such as DriveThruRPG, Patreon, or custom storefronts) must deploy an automated server-side **Publisher Re-signing API**. 
 
 This API intercepts raw unencrypted master map packages uploaded by cartographers, dynamically processes them, derives unique cryptographic keys using a **Zero-Knowledge-Storage (ZKS) model**, encrypts the entire zipped layout package via AES-256-GCM, generates a tamper-proof integrity receipt (`manifest.hash`), and outputs a standard-compliant, streamable `.uvtt2k` campaign archive (GCM encrypted ZIP envelope).
 
-```mermaid
-graph TD
-    A[Publisher / Cartographer] -->|Uploads Raw Master Map .zip / .uvtt2| B[(Storefront Database)]
-    B -->|Stores Raw WebP, JSON Layout, SKU ID| C[Re-signing API Ingestion]
-    
-    C -->|Split-Resolution Processing| D["Down-sample base map to 50px/grd<br>and burn order/SKU watermark"]
-    C -->|ZKS Key Derivation| E["Derive encryption key via<br>HMAC-SHA256 in volatile RAM"]
-    
-    E --> F["Compress package into standard ZIP<br>then encrypt entire stream via AES-256-GCM<br>outputting .uvtt2k container"]
-    
-    D --> G["Compile directories, generate<br>SHA-256 hash list (manifest.hash)"]
-    F --> G
-    
-    G -->|Packages into final .uvtt2z| H[End-User Client VTT / GoVTT]
+---
 
-    %% Color Styling for Visual Polish %%
-    style A fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#1e293b
-    style B fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0369a1
-    style C fill:#f3e8ff,stroke:#7e22ce,stroke-width:2px,color:#6b21a8
-    style D fill:#fee2e2,stroke:#b91c1c,stroke-width:2px,color:#991b1b
-    style E fill:#fff7ed,stroke:#c2410c,stroke-width:2px,color:#9a3412
-    style F fill:#fff7ed,stroke:#c2410c,stroke-width:2px,color:#9a3412
-    style G fill:#dcfce7,stroke:#15803d,stroke-width:2px,color:#166534
-    style H fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#1e293b
+## 🗺️ System Architecture & Data Flow
+
+```
+   ┌────────────────────────────────────────────────────────┐
+   │                  Publisher / Cartographer              │
+   └───────────────────────────┬────────────────────────────┘
+                               │ Uploads Raw Master Map (.zip / .uvtt2)
+                               ▼
+   ┌────────────────────────────────────────────────────────┐
+   │                  Storefront Database                   │
+   └───────────────────────────┬────────────────────────────┘
+                               │ Stores Raw WebP, JSON Layout, SKU ID
+                               ▼
+               ┌───────────────────────────────┐
+               │    Re-signing API Ingestion   │
+               └───────────────┬───────────────┘
+                               │
+         ┌─────────────────────┴─────────────────────┐
+         ▼ (Split-Resolution Processing)             ▼ (ZKS Key Derivation)
+┌──────────────────────────────────┐        ┌──────────────────────────────────┐
+│ Down-sample base map to 50px/grd │        │ Derive encryption key via        │
+│ and burn order/SKU watermark     │        │ HMAC-SHA256 in volatile RAM      │
+│                                  │        └─────────────────┬────────────────┘
+└────────────────┬─────────────────┘                          │
+                 │                                            ▼
+                 │                          ┌──────────────────────────────────┐
+                 │                          │ Encrypt high-res maps and        │
+                 │                          │ audio assets via AES-256-GCM     │
+                 │                          │ natively into the `.uvtt2k` package envelope.             │
+                 │                          └─────────────────┬────────────────┘
+                 ▼                                            │
+   ┌──────────────────────────────────────────────────────────┴────────────────┘
+   │ Compile directories, generate SHA-256 hash list (`manifest.hash`).        │
+   └───────────────────────────┬───────────────────────────────────────────────┘
+                               │ Packages into final .uvtt2z
+                               ▼
+   ┌────────────────────────────────────────────────────────┐
+   │              End-User Client VTT / GoVTT               │
+   └────────────────────────────────────────────────────────┐
 ```
 
 ---
 
-## 2. OpenAPI 3.0.3 Contract
+## 📝 OpenAPI 3.0.3 API Blueprint
 
 This API contract standardizes the secure endpoint structure used by digital storefront backends to dynamically re-sign and compile protected map packages during customer checkouts.
 
@@ -148,24 +159,24 @@ paths:
 
 ---
 
-## 3. Core Security & Cryptographic Compliance Mandates
+## 🛡️ Core Security & Cryptographic Compliance
 
 To remain strictly compliant with the **UVTT v2 DRM Subsystem Specification**, storefront implementations of this API blueprint must enforce the following three engineering mandates:
 
-### 3.1. Zero-Knowledge-Storage (ZKS) Key Derivation
+### 1. Zero-Knowledge-Storage (ZKS) Key Derivation
 The storefront server **must never** store the derived decryption keys in a database. Instead, the symmetric encryption key is calculated entirely in volatile, temporary CPU memory on-demand using standard HMAC-SHA256 calculations based on a secure, locally-held master secret:
 
-$$K_{\text{derive}} = \text{HMAC-SHA256}(S_{\text{master}}, \text{SKU} + \text{Salt})$$
+$$\text{Decryption Key} = \text{HMAC-SHA256}(\text{RETAILER\_MASTER\_SECRET}, \text{Product SKU} + \text{Key Salt})$$
 
 This derived key is then used to initialize the `AES-256-GCM` encryption cipher. The key itself is instantly flushed from the server's heap memory once the compression stream finishes, eliminating database-compromise vulnerabilities.
 
-### 3.2. Split-Resolution Processing
+### 2. Split-Resolution Processing
 The API must dynamically scale down and watermark the high-resolution source map to compile the unencrypted public fallback image:
 *   **Grid Calibration:** The pipeline must parse `geometry.json` to extract scale boundaries.
-*   **Resolution Cap:** The unencrypted **`basemap.webp`** must be dynamically scaled down to **exactly 50 pixels per grid square** (calculating the ratio dynamically from the geometry scale).
+*   **Resolution Cap:** The unencrypted **`basemap.webp`** must be dynamically scaled down to **exactly 50 pixels per grid square**.
 *   **Visible Watermarking:** A semi-transparent watermark containing a rotated transaction hash (e.g., `TX-7719302-XYZ`) must be burned directly into the raw pixels of `basemap.webp` during the export pass, rendering the fallback useless for high-quality printing or unauthorized redistribution.
 
-### 3.3. Root Archive Integrity Signatures (`manifest.hash`)
+### 3. Root Archive Integrity Signatures (`manifest.hash`)
 To block any post-export vector manipulation, script injection, or malicious payload alterations, the API must generate a root validation receipt:
 *   Immediately following the compression of all files, the API iterates through the ZIP archive, computing the SHA-256 hash of every individual file.
 *   These mappings are written into a flat, newline-separated text file named **`manifest.hash`** at the root of the archive:

@@ -177,14 +177,12 @@ Audio structures are divided into three strict playback tiers [75, 76]:
 
 $$V = \max\left(0, \min\left(V_{\text{max}}, V_{\text{max}} \times \left(1 - \frac{d}{r}\right)\right)\right)$$
 
-Where $V$ represents the resulting playback volume, $V_{\text{max}}$ is the maximum volume cap [79], $d$ is the shortest geometric distance between the token and the zone's boundary [79], and $r$ is the outer `fade_radius` [79]. If $d \ge r$, $V = 0.0$ [79]. Additionally, an optional muffled_by_geometry boolean flag determines if the VTT's acoustic engine should apply material-aware raycasting to block sound through closed portals and walls.
+Where $V$ represents the resulting playback volume, $V_{\text{max}}$ is the maximum volume cap [79], $d$ is the shortest geometric distance between the token and the zone's boundary [79], and $r$ is the outer `fade_radius` [79]. If $d \ge r$, $V = 0.0$ [79].
 
 ### 5.5. Weather Emitters & Fluid Dynamics
 Weather zones are mapped using geometric polygons. To minimize CPU overhead, the specification defines spatial coordinates and environmental scaling variables, letting the client VTT's GPU handle rendering [370, 373]:
 
 * **The Presets (`type`):** Supports `rain`, `snow`, `fog`, `embers`, and `magic` shaders [373, 467].
-* **Global Overrides (`is_global`):** If true, the particle system blankets the entire map and the bounds polygon object becomes mathematically optional.
-* **Z-Index Layering (`render_layer`):** Defines where the particles sit in the rendering stack (`above_overhead`, `below_overhead`, `ground_level`).
 * **Height-Aware Clamping (`height`):** An optional bounding cylinder mapping standard bottom and top vertical planes, blocking particle rendering from bleeding onto upper floors or cellars [471].
 * **Boundary Collision Mode (`collision_mode`):** Specifies shader collision interactions [471]:
   * `none`: Ignores all physical barriers.
@@ -272,6 +270,16 @@ To encourage developer adoption and eliminate legal barriers for competitors, di
 
 * **Layouts and Schemas (Creative Commons CC0 1.0 Universal):** Core JSON validation schemas, directories, file extensions, and the `manifest.hash` index format are dedicated to the public domain [491, 492]. No platform may claim proprietary patent, copyright, or trade secret rights over the file structure layouts [492].
 * **Reference Implementation Code (Apache License 2.0):** Reference parsers, WebCrypto workers, and CI/CD validation scripts are licensed under Apache 2.0 [492]. Section 3 of this license grants all developers a perpetual, royalty-free, and irrevocable patent license to implement the specification inside commercial or proprietary engines [492, 493].
+
+---
+
+
+### 7.4. Repository Documentation & Developer Resources
+To accelerate platform adoption and minimize integration friction, the official UVTT v2 specification repository houses complete, production-ready implementation guides and shader cookbooks inside the **`./docs/`** subdirectory:
+
+1. **`docs/artist-packaging-guide.md` (The Artist's .uvtt2a Packaging Guide):** A non-technical, step-by-step walk-through for digital painters, audio engineers, and token creators to package their assets using the standalone `.uvtt2a` format.
+2. **`docs/exporter-integration-blueprint.md` (Mapmaking Tool Exporter Integration Blueprint):** A highly technical guide for map-making software developers (such as authors of CAD/GIS tools) detailing coordinate translation, collinear simplification, and campaign ZIP packaging.
+3. **`docs/vtt-shader-cookbook.md` (The VTT Graphics and Shader Cookbook):** A performance-oriented resource for VTT graphics programmers containing complete WGSL and GLSL shader code for point lights, acoustic occlusion raycasting, and GPU particle weather emitters.
 
 ---
 
@@ -517,8 +525,7 @@ The three production-ready JSON payloads below demonstrate the exact, validated 
         "radius": 4.0,
         "fade_radius": 6.0,
         "volume_max": 0.85,
-        "audio_uri": "assets/sfx_dripping_water.ogg",
-        "muffled_by_geometry": true
+        "audio_uri": "assets/sfx_dripping_water.ogg"
       }
     ]
   },
@@ -526,7 +533,6 @@ The three production-ready JSON payloads below demonstrate the exact, validated 
     {
       "id": "weather_blizzard_courtyard",
       "type": "snow",
-      "is_global": false,
       "bounds": {
         "shape": "polygon",
         "points": [
@@ -545,7 +551,6 @@ The three production-ready JSON payloads below demonstrate the exact, validated 
         "speed": 4.5,
         "angle": 135.0,
         "color": "#ffffff",
-        "render_layer": "above_overhead",
         "collision_mode": "mask_under_overhead",
         "wind_influence": {
           "inherit_global": true,
@@ -556,3 +561,98 @@ The three production-ready JSON payloads below demonstrate the exact, validated 
   ]
 }
 ```
+
+
+---
+
+## Section 9: Standalone Asset Archives (`.uvtt2a`)
+
+### 9.1. Purpose & Scope
+The `.uvtt2a` standard defines a unified, metadata-rich archive specifically designed for delivering Virtual Tabletop assets (Audio, Tokens, Props) without requiring an underlying map geometry manifest. This standard allows premium creators to distribute packs that native UVTT v2 engines can instantly mount, index, and decrypt, while preserving artist-defined behaviors (like default scaling or auto-emitted lighting).
+
+### 9.2. Archive Structure
+A `.uvtt2a` payload must be delivered as a standard ZIP archive. The archive may be plaintext or AES-GCM encrypted. The internal structure must cleanly separate assets by type, accompanied by a root-level `asset_manifest.json`:
+
+```text
+package-root.uvtt2a/            # Standalone Asset Archive
+├── asset_manifest.json        # Asset pack metadata and configuration registry
+└── assets/                    # Shared Binary Assets
+    ├── audio/                 # Nested folder containing audio loops (OGG, MP3)
+    ├── tokens/                # Nested folder containing actor tokens (WebP, PNG)
+    └── props/                 # Nested folder containing decorative props (WebP, PNG)
+```
+
+### 9.3. The `asset_manifest.json` Schema
+The manifest acts as the primary registry, dictating exactly how the VTT engine should interpret the assets upon import. It requires basic metadata properties and structures assets under categories:
+
+```json
+{
+  "format_version": "2.0.0",
+  "package_type": "asset_pack",
+  "pack_name": "Tavern & Firelight Essentials Pack",
+  "author": "TheGeolama Assets",
+  "version": "1.0.0",
+  "assets": {
+    "audio": [
+      {
+        "id": "audio-loop-fireplace-crackling",
+        "file": "assets/audio/fire_crackle.ogg",
+        "name": "Fireplace Crackling SFX Loop",
+        "default_volume": 0.80,
+        "is_loop": true,
+        "tags": ["fire", "ambient", "sfx", "loop"]
+      }
+    ],
+    "props": [
+      {
+        "id": "prop-interactive-hearth-campfire",
+        "file": "assets/props/hearth_campfire.webp",
+        "name": "Roaring Stone Hearth Campfire Prop",
+        "default_scale": 100.0,
+        "grid_footprint": {
+          "width_in_grids": 2.0,
+          "height_in_grids": 2.0
+        },
+        "tags": ["prop", "furniture", "light", "sfx", "emitter"],
+        "auto_emits": [
+          {
+            "type": "light",
+            "color": "#f97316",
+            "bright_radius": 5.0,
+            "dim_radius": 10.0,
+            "decay": "inverse_square",
+            "animation": {
+              "type": "flicker",
+              "speed": 1.2,
+              "intensity_variance": 0.2
+            }
+          },
+          {
+            "type": "audio",
+            "audio_uri": "assets/audio/fire_crackle.ogg",
+            "volume_max": 0.80,
+            "fade_radius": 6.0,
+            "muffled_by_geometry": true
+          },
+          {
+            "type": "emitter",
+            "emitter_type": "embers",
+            "properties": {
+              "intensity": 0.45,
+              "speed": 1.5,
+              "angle": 270.0,
+              "color": "#ff5500"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 9.4. Engine Import Behavior Requirements
+When a compliant UVTT v2 engine imports a `.uvtt2a` file, it MUST abide by the following behaviors:
+1. **Asset Mounting:** The assets must be extracted and made available to the GM's global asset pool.
+2. **Metadata Inheritance:** If a GM drags a prop onto the canvas, the engine MUST apply the `default_scale` defined in the manifest.
+3. **Auto-Emission Trigger:** If a prop defines an `auto_emits` array, the engine MUST automatically generate the corresponding entities (e.g., a Point Light, an Audio Zone, or a Particle Emitter) centered precisely on the prop's coordinate when placed.

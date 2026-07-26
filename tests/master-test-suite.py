@@ -33,9 +33,19 @@ try:
     import jwt
     from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     HAS_CRYPTO = True
 except ImportError:
     HAS_CRYPTO = False
+
+from io import BytesIO
+
+def derive_key(secret: str, sku: str, salt: str) -> bytes:
+    import hmac
+    import hashlib
+    msg = (sku + salt).encode("utf-8")
+    h = hmac.new(secret.encode("utf-8"), msg, hashlib.sha256)
+    return h.digest()
 
 # ANSI Color Codes
 COLOR_RESET = "\033[0m"
@@ -65,12 +75,15 @@ def log_error(msg):
 # =====================================================================
 
 class UVTT2ConformanceChecker:
-    def __init__(self, archive_path, quiet=False):
+    def __init__(self, archive_path, quiet=False, secret=None, sku=None, salt=None):
         self.archive_path = archive_path
         self.quiet = quiet
         self.temp_dir = None
         self.files_map = {}
         self.manifest_data = None
+        self.secret = secret or "RETAILER_MASTER_CRITICAL_SECRET_2026_07_11"
+        self.sku = sku or "SKU-DUNGEON-001"
+        self.salt = salt or "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" 
 
     def run_all(self):
         log_info(f"Initiating full validation sequence for: {self.archive_path}", self.quiet)
@@ -78,12 +91,33 @@ class UVTT2ConformanceChecker:
             log_error(f"Target archive not found: {self.archive_path}")
             return False
 
-        if not zipfile.is_zipfile(self.archive_path):
+        is_encrypted = self.archive_path.endswith(".uvtt2k")
+        if not is_encrypted and not zipfile.is_zipfile(self.archive_path):
             log_error("Target file is not a valid ZIP container archive (.uvtt2z / .gvtt).")
             return False
 
         try:
-            with zipfile.ZipFile(self.archive_path, 'r') as zf:
+            if is_encrypted:
+                log_info("[*] Decrypted .uvtt2k GCM envelope requested. Initializing decryption handshake...", self.quiet)
+                if not HAS_CRYPTO:
+                    log_error("cryptography package is required to decrypt .uvtt2k containers.")
+                    return False
+                with open(self.archive_path, "rb") as f:
+                    enc_bytes = f.read()
+                if len(enc_bytes) < 12:
+                    log_error("Encrypted payload too short (missing 12-byte IV).")
+                    return False
+                nonce = enc_bytes[:12]
+                ciphertext = enc_bytes[12:]
+                key = derive_key(self.secret, self.sku, self.salt)
+                aesgcm = AESGCM(key)
+                decrypted_zip = aesgcm.decrypt(nonce, ciphertext, None)
+                zf_input = BytesIO(decrypted_zip)
+                log_success("Decryption handshake successful! Decrypted .uvtt2k in-memory stream safely.", self.quiet)
+            else:
+                zf_input = self.archive_path
+
+            with zipfile.ZipFile(zf_input, 'r') as zf:
                 # 1. Inspect file catalog
                 namelist = zf.namelist()
                 for name in namelist:
@@ -172,13 +206,38 @@ class UVTT2ConformanceChecker:
         return True
 
     def validate_map_directory_files(self, path, standalone=False):
+        manifest_path = f"{path}manifest.json" if not standalone else "manifest.json"
         geom_path = f"{path}geometry.json" if not standalone else "geometry.json"
         ent_path = f"{path}entities.json" if not standalone else "entities.json"
-        base_path = f"{path}basemap.webp" if not standalone else "basemap.webp"
+        
+        if standalone:
+            map_path = "assets/map.webp"
+            base_path = "assets/basemap.webp"
+        else:
+            map_path = f"{path}map.webp"
+            base_path = f"{path}basemap.webp"
+
+        # Validate localized manifest
+        if manifest_path not in self.files_map:
+            log_error(f"Missing mandatory localized map manifest: {manifest_path}")
+            return False
+        try:
+            sub_manifest = json.loads(self.files_map[manifest_path].decode("utf-8"))
+            if sub_manifest.get("format_version") != "2.0.0":
+                log_error(f"Localized sub-map manifest '{manifest_path}' must identify as format '2.0.0'.")
+                return False
+        except Exception as e:
+            log_error(f"Syntax error inside sub-map manifest {manifest_path}: {e}")
+            return False
 
         # Validate basemap
         if base_path not in self.files_map:
             log_error(f"Missing baseline raster texture asset: {base_path}")
+            return False
+
+        # Validate map high-res
+        if map_path not in self.files_map:
+            log_error(f"Missing full-fidelity map asset: {map_path}")
             return False
 
         # Validate geometry
@@ -318,38 +377,6 @@ class UVTT2ConformanceChecker:
             if fade_rad <= 0.0:
                 log_error(f"Localized acoustic zone decay boundary for '{zone_id}' must be positive and non-zero: {fade_rad}")
                 return False
-
-            muffled_by_geom = zone.get("muffled_by_geometry")
-            if muffled_by_geom is not None and not isinstance(muffled_by_geom, bool):
-                log_error(f"Sound zone '{zone_id}' parameter 'muffled_by_geometry' must be a boolean: {muffled_by_geom}")
-                return False
-
-        # Validate Emitters
-        emitters = ent.get("emitters", [])
-        for em in emitters:
-            em_id = em.get("id", "unnamed")
-            em_type = em.get("type")
-            is_glob = em.get("is_global", False)
-            if not isinstance(is_glob, bool):
-                log_error(f"Emitter '{em_id}' parameter 'is_global' must be a boolean.")
-                return False
-                
-            if not is_glob and "bounds" not in em:
-                log_error(f"Local emitter '{em_id}' (is_global=false) must define a spatial 'bounds' object.")
-                return False
-                
-            props = em.get("properties", {})
-            render_lay = props.get("render_layer")
-            if render_lay is not None and render_lay not in ["above_overhead", "below_overhead", "ground_level"]:
-                log_error(f"Emitter '{em_id}' parameter 'render_layer' must be one of ['above_overhead', 'below_overhead', 'ground_level']: '{render_lay}'")
-                return False
-                
-            wind_infl = props.get("wind_influence", {})
-            if wind_infl:
-                infl_scale = wind_infl.get("influence_scale", 1.0)
-                if infl_scale is not None and not (0.0 <= infl_scale <= 2.0):
-                    log_error(f"Emitter '{em_id}' influence_scale '{infl_scale}' must be between 0.0 and 2.0.")
-                    return False
 
         return True
 
@@ -775,51 +802,6 @@ def execute_programmatic_self_test():
         log_error("Self-Test Failed: Validator missed multi-default landing zone violations.")
         return False
 
-    # 5. Test modern weather emitters & spatial audio validations
-    mock_modern_entities = {
-        "landing_zones": [
-            {"id": "lz1", "coordinates": [5.0, 5.0], "is_default": True, "heading_degrees": 90.0}
-        ],
-        "audio": {
-            "zones": [
-                {
-                    "id": "ac1", "shape": "circle", "radius": 50.0, "fade_radius": 20.0, "volume_max": 0.8, 
-                    "audio_uri": "test.ogg", "muffled_by_geometry": True
-                }
-            ]
-        },
-        "emitters": [
-            {
-                "id": "em1", "type": "snow", "is_global": True,
-                "properties": {
-                    "intensity": 0.5, "speed": 1.0, "angle": 45.0, "color": "#ffffff",
-                    "render_layer": "above_overhead"
-                }
-            }
-        ]
-    }
-    if not checker.validate_entities_schema(mock_modern_entities):
-        log_error("Self-Test Failed: Modern entities (with is_global, muffled_by_geometry, render_layer) failed validation.")
-        return False
-
-    # 6. Test failing weather emitter (is_global=false but bounds missing)
-    failing_modern_entities = {
-        "landing_zones": [
-            {"id": "lz1", "coordinates": [5.0, 5.0], "is_default": True, "heading_degrees": 90.0}
-        ],
-        "emitters": [
-            {
-                "id": "em1", "type": "snow", "is_global": False, # Omitted bounds
-                "properties": {
-                    "intensity": 0.5, "speed": 1.0, "angle": 45.0, "color": "#ffffff"
-                }
-            }
-        ]
-    }
-    if checker.validate_entities_schema(failing_modern_entities):
-        log_error("Self-Test Failed: Missed missing bounds on local weather emitter.")
-        return False
-
     log_success("Internal programmatic checks: ALL SCHEMAS CONFORM!")
     return True
 
@@ -852,6 +834,14 @@ def main():
     parser.add_argument(
         "--secret", default="RETAILER_MASTER_CRITICAL_SECRET_2026_07_11",
         help="The Retailer Master Secret for key derivation calculations."
+    )
+    parser.add_argument(
+        "--sku", default="SKU-DUNGEON-001",
+        help="Product SKU identifier."
+    )
+    parser.add_argument(
+        "--salt", default="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        help="Deterministic cryptographic salt."
     )
     parser.add_argument(
         "-q", "--quiet", action="store_true",
@@ -921,7 +911,7 @@ def main():
 
     # Execution Phase 3: Archive Conformance Checks
     if args.archive:
-        checker = UVTT2ConformanceChecker(args.archive, args.quiet)
+        checker = UVTT2ConformanceChecker(args.archive, args.quiet, secret=args.secret, sku=args.sku, salt=args.salt)
         if not checker.run_all():
             success = False
 
