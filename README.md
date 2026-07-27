@@ -104,7 +104,7 @@ Core features—including basic walls, portals, and landing zones—are immutabl
 
 ### 🔗 Getting Started
 
-- **[View the Full Specification](schemas/)**
+- **[View the Full Specification](https://github.com/TheGeolama/uvtt-v2-specification/tree/master/schemas)**
 - **[Launch the Reference Upgrader Web App](https://upgrader.universalvtt.org)** (A zero-install Single Page Application to migrate and graphically upgrade legacy maps to v2 natively in your browser).
 - **[View the Source Code on GitHub](https://repo.universalvtt.org)**
 - **[Join the Discussion](https://discuss.universalvtt.org)**
