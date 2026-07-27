@@ -1,13 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "UVTT v2 Geometry Schema",
-  "description": "Defines vector path geometry, SVG Bezier nodes, vertical heights, normal directions, and overhead roofs.",
+  "title": "UVTT v2 Material Geometry Schema (geometry.schema.json)",
+  "description": "Validation rules for structural geometry, grid scaling, walls, portals, and overhead layers.",
   "type": "object",
   "required": [
     "format_version",
     "resolution",
     "geometry"
   ],
+  "additionalProperties": false,
   "properties": {
     "format_version": {
       "type": "string",
@@ -24,6 +25,7 @@
         "unit_name",
         "topology"
       ],
+      "additionalProperties": false,
       "properties": {
         "map_origin": {
           "type": "object",
@@ -31,6 +33,7 @@
             "x",
             "y"
           ],
+          "additionalProperties": false,
           "properties": {
             "x": {
               "type": "number"
@@ -46,6 +49,7 @@
             "x",
             "y"
           ],
+          "additionalProperties": false,
           "properties": {
             "x": {
               "type": "number"
@@ -56,7 +60,8 @@
           }
         },
         "units_per_grid": {
-          "type": "number"
+          "type": "number",
+          "minimum": 0.1
         },
         "unit_name": {
           "type": "string"
@@ -66,6 +71,7 @@
           "required": [
             "type"
           ],
+          "additionalProperties": false,
           "properties": {
             "type": {
               "type": "string",
@@ -93,7 +99,7 @@
             },
             "isometric_ratio": {
               "type": "number",
-              "minimum": 0.0,
+              "minimum": 0.1,
               "maximum": 1.0
             }
           }
@@ -104,8 +110,10 @@
       "type": "object",
       "required": [
         "walls",
-        "portals"
+        "portals",
+        "overhead"
       ],
+      "additionalProperties": false,
       "properties": {
         "walls": {
           "type": "array",
@@ -117,6 +125,7 @@
               "height",
               "path"
             ],
+            "additionalProperties": false,
             "properties": {
               "id": {
                 "type": "string"
@@ -126,6 +135,7 @@
                 "enum": [
                   "standard",
                   "terrain",
+                  "invisible",
                   "illusory"
                 ]
               },
@@ -135,6 +145,7 @@
                   "bottom",
                   "top"
                 ],
+                "additionalProperties": false,
                 "properties": {
                   "bottom": {
                     "type": "number"
@@ -144,20 +155,9 @@
                   }
                 }
               },
-              "blocks": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "enum": [
-                    "light",
-                    "sight",
-                    "movement"
-                  ]
-                }
-              },
               "path": {
                 "type": "array",
-                "minItems": 1,
+                "minItems": 2,
                 "items": {
                   "type": "object",
                   "required": [
@@ -228,10 +228,7 @@
               },
               "directional_blocks": {
                 "type": "object",
-                "required": [
-                  "left_to_right",
-                  "right_to_left"
-                ],
+                "additionalProperties": false,
                 "properties": {
                   "left_to_right": {
                     "type": "array",
@@ -259,6 +256,7 @@
               },
               "states": {
                 "type": "object",
+                "additionalProperties": false,
                 "properties": {
                   "ethereal": {
                     "type": "boolean"
@@ -270,6 +268,17 @@
                     }
                   }
                 }
+              },
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "visible",
+                  "gm_only",
+                  "hidden"
+                ]
+              },
+              "sync_id": {
+                "type": "string"
               }
             }
           }
@@ -286,6 +295,7 @@
               "blocks",
               "line"
             ],
+            "additionalProperties": false,
             "properties": {
               "id": {
                 "type": "string"
@@ -293,13 +303,16 @@
               "type": {
                 "type": "string",
                 "enum": [
-                  "door"
+                  "door",
+                  "window",
+                  "secret"
                 ]
               },
               "sub_type": {
                 "type": "string",
                 "enum": [
                   "standard",
+                  "sliding",
                   "secret"
                 ]
               },
@@ -307,7 +320,9 @@
                 "type": "string",
                 "enum": [
                   "open",
-                  "closed"
+                  "closed",
+                  "locked",
+                  "broken"
                 ]
               },
               "height": {
@@ -316,6 +331,7 @@
                   "bottom",
                   "top"
                 ],
+                "additionalProperties": false,
                 "properties": {
                   "bottom": {
                     "type": "number"
@@ -342,6 +358,7 @@
                   "p1",
                   "p2"
                 ],
+                "additionalProperties": false,
                 "properties": {
                   "p1": {
                     "type": "object",
@@ -374,6 +391,32 @@
                     }
                   }
                 }
+              },
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "visible",
+                  "gm_only",
+                  "hidden"
+                ]
+              },
+              "sync_id": {
+                "type": "string"
+              },
+              "visuals": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "uri_closed": {
+                    "type": "string"
+                  },
+                  "uri_open": {
+                    "type": "string"
+                  },
+                  "uri_broken": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }
@@ -389,6 +432,7 @@
               "polygon",
               "image"
             ],
+            "additionalProperties": false,
             "properties": {
               "id": {
                 "type": "string"
@@ -396,7 +440,8 @@
               "type": {
                 "type": "string",
                 "enum": [
-                  "roof"
+                  "roof",
+                  "canopy"
                 ]
               },
               "height": {
@@ -405,6 +450,7 @@
                   "bottom",
                   "top"
                 ],
+                "additionalProperties": false,
                 "properties": {
                   "bottom": {
                     "type": "number"
@@ -438,11 +484,23 @@
                 "required": [
                   "uri"
                 ],
+                "additionalProperties": false,
                 "properties": {
                   "uri": {
                     "type": "string"
                   }
                 }
+              },
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "visible",
+                  "gm_only",
+                  "hidden"
+                ]
+              },
+              "sync_id": {
+                "type": "string"
               }
             }
           }

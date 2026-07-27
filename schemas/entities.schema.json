@@ -1,11 +1,19 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "UVTT v2 Entities Schema",
-  "description": "Defines interactive components including 3D lighting, landing zones, teleportation scripts, weather systems, and 3-tier audio layers.",
+  "title": "UVTT v2 Interactive Entities Schema (entities.schema.json)",
+  "description": "JSON Schema validating interactive layers in Universal VTT v2 including lights, landing zones, events, ambient audio zones, and atmospheric weather/particle emitters.",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
+    "format_version": {
+      "type": "string",
+      "enum": [
+        "2.0.0"
+      ]
+    },
     "lights": {
       "type": "array",
+      "description": "An array of dynamic 3D-aware light sources.",
       "items": {
         "type": "object",
         "required": [
@@ -17,16 +25,19 @@
           "dim_radius",
           "decay"
         ],
+        "additionalProperties": false,
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "description": "Unique identifier for this light source."
           },
           "type": {
             "type": "string",
             "enum": [
               "point",
               "directional"
-            ]
+            ],
+            "description": "Point casts light 360 degrees. Directional limits illumination to a sector cone."
           },
           "position": {
             "type": "object",
@@ -35,6 +46,7 @@
               "y",
               "z"
             ],
+            "additionalProperties": false,
             "properties": {
               "x": {
                 "type": "number"
@@ -43,26 +55,33 @@
                 "type": "number"
               },
               "z": {
-                "type": "number"
+                "type": "number",
+                "description": "3D height position of the light source relative to the floor plane."
               }
             }
           },
           "color": {
             "type": "string",
-            "pattern": "^#[a-fA-F0-9]{6}$"
+            "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$",
+            "description": "6-character hex code (#RRGGBB) or 8-character hex code with alpha (#RRGGBBAA)."
           },
           "bright_radius": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0.0,
+            "description": "Radius of bright light in physical units (e.g. feet/meters)."
           },
           "dim_radius": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0.0,
+            "description": "Total radius of illumination (dim light begins where bright light ends)."
           },
           "decay": {
             "type": "string",
             "enum": [
               "linear",
               "inverse_square"
-            ]
+            ],
+            "description": "Mathematical decay model. Inverse-square models physical light attenuation."
           },
           "cone": {
             "type": "object",
@@ -70,12 +89,19 @@
               "rotation",
               "arc"
             ],
+            "additionalProperties": false,
             "properties": {
               "rotation": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 360.0,
+                "description": "The center direction of the cone beam in degrees."
               },
               "arc": {
-                "type": "number"
+                "type": "number",
+                "minimum": 1.0,
+                "maximum": 360.0,
+                "description": "The angular width of the beam in degrees (e.g. 60.0 for a bullseye lantern)."
               }
             }
           },
@@ -86,6 +112,7 @@
               "speed",
               "intensity_variance"
             ],
+            "additionalProperties": false,
             "properties": {
               "type": {
                 "type": "string",
@@ -95,18 +122,34 @@
                 ]
               },
               "speed": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0.0
               },
               "intensity_variance": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "description": "Flicker/pulse depth ratio (0.0 = static, 1.0 = full amplitude)."
               }
             }
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "gm_only",
+              "hidden"
+            ]
+          },
+          "sync_id": {
+            "type": "string"
           }
         }
       }
     },
     "landing_zones": {
       "type": "array",
+      "description": "Explicit player token starting positions or camera anchors.",
       "items": {
         "type": "object",
         "required": [
@@ -116,6 +159,7 @@
           "coordinates",
           "heading_degrees"
         ],
+        "additionalProperties": false,
         "properties": {
           "id": {
             "type": "string"
@@ -124,7 +168,8 @@
             "type": "string"
           },
           "is_default": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "If true, this is the main starting zone. Exactly one is_default=true is permitted per map."
           },
           "coordinates": {
             "type": "array",
@@ -132,36 +177,53 @@
             "maxItems": 2,
             "items": {
               "type": "number"
-            }
+            },
+            "description": "[X, Y] absolute coordinate array of the landing zone."
           },
           "heading_degrees": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 360.0,
+            "description": "Compass direction players face upon arrival."
           },
           "properties": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
               "description": {
                 "type": "string"
               },
               "camera_zoom_level": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0.1
               }
             }
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "gm_only",
+              "hidden"
+            ]
+          },
+          "sync_id": {
+            "type": "string"
           }
         }
       }
     },
     "events": {
       "type": "array",
+      "description": "Interactive triggers such as traps, teleporters, stairs, or pitfalls.",
       "items": {
         "type": "object",
         "required": [
           "id",
           "type",
-          "trigger_bounds",
-          "conditions",
-          "destination"
+          "trigger_bounds"
         ],
+        "additionalProperties": false,
         "properties": {
           "id": {
             "type": "string"
@@ -178,6 +240,7 @@
             "required": [
               "shape"
             ],
+            "additionalProperties": false,
             "properties": {
               "shape": {
                 "type": "string",
@@ -188,12 +251,14 @@
               },
               "points": {
                 "type": "array",
+                "minItems": 3,
                 "items": {
                   "type": "object",
                   "required": [
                     "x",
                     "y"
                   ],
+                  "additionalProperties": false,
                   "properties": {
                     "x": {
                       "type": "number"
@@ -210,6 +275,7 @@
                   "x",
                   "y"
                 ],
+                "additionalProperties": false,
                 "properties": {
                   "x": {
                     "type": "number"
@@ -220,12 +286,14 @@
                 }
               },
               "radius": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0.0
               }
             }
           },
           "conditions": {
             "type": "object",
+            "additionalProperties": false,
             "properties": {
               "requires_interaction": {
                 "type": "boolean"
@@ -249,10 +317,7 @@
           },
           "destination": {
             "type": "object",
-            "required": [
-              "type",
-              "uri"
-            ],
+            "additionalProperties": false,
             "properties": {
               "type": {
                 "type": "string",
@@ -263,7 +328,7 @@
               },
               "uri": {
                 "type": "string",
-                "description": "Unified URI using internal:// (compound) or relative:// (federated) routing targets."
+                "description": "Standardized URI target: internal://{map_slug} or relative://{package_file}."
               },
               "fade_transition": {
                 "type": "string",
@@ -274,7 +339,83 @@
               },
               "prediction_trigger_radius": {
                 "type": "number",
-                "description": "Trigger buffer threshold in grids to pre-slice tiles."
+                "minimum": 0.0,
+                "description": "Proximity radius in grid units to pre-fetch target assets before transition executes."
+              }
+            }
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "gm_only",
+              "hidden"
+            ]
+          },
+          "sync_id": {
+            "type": "string"
+          },
+          "portal_dependency": {
+            "type": "object",
+            "required": [
+              "portal_id",
+              "allowed_states"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "portal_id": {
+                "type": "string"
+              },
+              "allowed_states": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "open",
+                    "closed",
+                    "locked",
+                    "broken"
+                  ]
+                }
+              },
+              "lock_feedback_message": {
+                "type": "string"
+              }
+            }
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "target_id",
+                "action_type",
+                "property",
+                "value"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "target_id": {
+                  "type": "string"
+                },
+                "action_type": {
+                  "type": "string",
+                  "enum": [
+                    "set_property",
+                    "play_sound",
+                    "trigger_event"
+                  ]
+                },
+                "property": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ]
+                }
               }
             }
           }
@@ -283,56 +424,24 @@
     },
     "audio": {
       "type": "object",
+      "required": [
+        "zones"
+      ],
+      "additionalProperties": false,
       "properties": {
-        "music": {
-          "type": "object",
-          "required": [
-            "uri",
-            "volume"
-          ],
-          "properties": {
-            "uri": {
-              "type": "string"
-            },
-            "volume": {
-              "type": "number",
-              "minimum": 0.0,
-              "maximum": 1.0
-            },
-            "crossfade_duration": {
-              "type": "number"
-            }
-          }
-        },
-        "ambience": {
-          "type": "object",
-          "required": [
-            "uri",
-            "volume"
-          ],
-          "properties": {
-            "uri": {
-              "type": "string"
-            },
-            "volume": {
-              "type": "number",
-              "minimum": 0.0,
-              "maximum": 1.0
-            }
-          }
-        },
         "zones": {
           "type": "array",
+          "description": "Localized, proximity-based acoustic zones.",
           "items": {
             "type": "object",
             "required": [
               "id",
               "shape",
-              "radius",
               "fade_radius",
               "volume_max",
               "audio_uri"
             ],
+            "additionalProperties": false,
             "properties": {
               "id": {
                 "type": "string"
@@ -350,6 +459,7 @@
                   "x",
                   "y"
                 ],
+                "additionalProperties": false,
                 "properties": {
                   "x": {
                     "type": "number"
@@ -360,18 +470,57 @@
                 }
               },
               "radius": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0.0
+              },
+              "points": {
+                "type": "array",
+                "minItems": 3,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "x",
+                    "y"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    }
+                  }
+                }
               },
               "fade_radius": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0.0,
+                "description": "Buffer distance beyond boundary where linear falloff attenuation begins."
               },
               "volume_max": {
                 "type": "number",
                 "minimum": 0.0,
-                "maximum": 1.0
+                "maximum": 1.0,
+                "description": "Maximum playback volume at or inside boundaries."
               },
               "audio_uri": {
+                "type": "string",
+                "description": "Local URI reference inside assets/ subdirectory."
+              },
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "visible",
+                  "gm_only",
+                  "hidden"
+                ]
+              },
+              "sync_id": {
                 "type": "string"
+              },
+              "muffled_by_geometry": {
+                "type": "boolean"
               }
             }
           }
@@ -380,17 +529,19 @@
     },
     "emitters": {
       "type": "array",
+      "description": "Atmospheric weather or magic particle emitter zones.",
       "items": {
         "type": "object",
         "required": [
           "id",
           "type",
-          "bounds",
           "properties"
         ],
+        "additionalProperties": false,
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "description": "Unique identifier for this particle emitter."
           },
           "type": {
             "type": "string",
@@ -400,13 +551,15 @@
               "fog",
               "embers",
               "magic"
-            ]
+            ],
+            "description": "Particle type preset. Drives shaders and physics parameters."
           },
           "bounds": {
             "type": "object",
             "required": [
               "shape"
             ],
+            "additionalProperties": false,
             "properties": {
               "shape": {
                 "type": "string",
@@ -417,12 +570,14 @@
               },
               "points": {
                 "type": "array",
+                "minItems": 3,
                 "items": {
                   "type": "object",
                   "required": [
                     "x",
                     "y"
                   ],
+                  "additionalProperties": false,
                   "properties": {
                     "x": {
                       "type": "number"
@@ -432,6 +587,26 @@
                     }
                   }
                 }
+              },
+              "center": {
+                "type": "object",
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                }
+              },
+              "radius": {
+                "type": "number",
+                "minimum": 0.0
               }
             }
           },
@@ -443,21 +618,94 @@
               "angle",
               "color"
             ],
+            "additionalProperties": false,
             "properties": {
               "intensity": {
                 "type": "number",
                 "minimum": 0.0,
-                "maximum": 1.0
+                "maximum": 1.0,
+                "description": "Scale of particle density/emission rates."
               },
               "speed": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0.0,
+                "description": "Velocity scale of particles."
               },
               "angle": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 360.0,
+                "description": "Drift direction in degrees (0.0 = straight down, 90.0 = blowing right)."
               },
               "color": {
                 "type": "string",
-                "pattern": "^#[a-fA-F0-9]{6}$"
+                "pattern": "^#[0-9a-fA-F]{6}$",
+                "description": "6-character hexadecimal color tint overlay (#RRGGBB)."
+              },
+              "render_layer": {
+                "type": "string",
+                "enum": [
+                  "above_overhead",
+                  "below_overhead",
+                  "ground_level"
+                ]
+              },
+              "collision_mode": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "mask_under_overhead",
+                  "ground_terminate",
+                  "wall_bounce"
+                ]
+              },
+              "wind_influence": {
+                "type": "object",
+                "required": [
+                  "inherit_global",
+                  "influence_scale"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "inherit_global": {
+                    "type": "boolean"
+                  },
+                  "influence_scale": {
+                    "type": "number",
+                    "minimum": 0.0,
+                    "maximum": 2.0
+                  }
+                }
+              }
+            }
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "visible",
+              "gm_only",
+              "hidden"
+            ]
+          },
+          "sync_id": {
+            "type": "string"
+          },
+          "is_global": {
+            "type": "boolean"
+          },
+          "height": {
+            "type": "object",
+            "required": [
+              "bottom",
+              "top"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "bottom": {
+                "type": "number"
+              },
+              "top": {
+                "type": "number"
               }
             }
           }

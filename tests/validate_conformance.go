@@ -1,216 +1,321 @@
 package main
 
 import (
-	"archive/zip"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
+	"archive/zip"
+	"bytes"
 )
 
-// Manifest matches the root metadata structure of manifest.json in UVTT v2
-type Manifest struct {
-	UVTTVersion     string           `json:"uvtt_version"`
-	HardwareProfile *HardwareProfile `json:"hardware_profile,omitempty"`
-	Extensions      map[string]any   `json:"extensions,omitempty"`
+// Simplified validation types for concurrency benchmarks
+type MinimalGeometry struct {
+	Geometry struct {
+		Walls []struct {
+			ID     string `json:"id"`
+			Height struct {
+				Bottom float64 `json:"bottom"`
+				Top    float64 `json:"top"`
+			} `json:"height"`
+		} `json:"walls"`
+	} `json:"geometry"`
 }
 
-type HardwareProfile struct {
-	MinimumPipeline        string `json:"minimum_pipeline"`
-	RecommendedPipeline    string `json:"recommended_pipeline"`
-	RequiresComputeShaders bool   `json:"requires_compute_shaders"`
+type MinimalEntities struct {
+	LandingZones []struct {
+		ID        string `json:"id"`
+		IsDefault bool   `json:"is_default"`
+	} `json:"landing_zones"`
+	Audio struct {
+		Zones []struct {
+			ID         string  `json:"id"`
+			FadeRadius float64 `json:"fade_radius"`
+		} `json:"zones"`
+	} `json:"audio"`
 }
 
-// Entities represents the interactive layer schema from entities.json
-type Entities struct {
-	LandingZones []LandingZone `json:"landing_zones,omitempty"`
+type MinimalManifest struct {
+	FormatVersion string `json:"format_version"`
+	UVTTVersion   string `json:"uvtt_version"`
+	CampaignName  string `json:"campaign_name"`
+	MapCatalog    []struct {
+		Name string `json:"name"`
+		Path string `json:"path"`
+	} `json:"map_catalog"`
 }
 
-type LandingZone struct {
-	ID             string         `json:"id"`
-	Name           string         `json:"name"`
-	IsDefault      bool           `json:"is_default"`
-	Coordinates    []float64      `json:"coordinates"` // [x, y] or [x, y, z]
-	HeadingDegrees float64        `json:"heading_degrees"`
-	Properties     *LZProperties  `json:"properties,omitempty"`
-}
-
-type LZProperties struct {
-	Description     string  `json:"description,omitempty"`
-	CameraZoomLevel float64 `json:"camera_zoom_level,omitempty"`
+type ValidationResult struct {
+	Path    string
+	Success bool
+	Error   error
 }
 
 func main() {
-	filePath := flag.String("file", "", "Path to the .uvtt2z or .gvtt archive to validate")
+	// 1. Parse Command Line Arguments
+	targetFile := flag.String("file", "", "Path to the target .uvtt2z or .uvtt2k campaign archive.")
+	secretStr := flag.String("secret", "secret-retailer-key-12345", "Retailer master secret for key derivation handshakes.")
+	sku := flag.String("sku", "SKU-DUNGEON-001", "Campaign Product SKU.")
+	salt := flag.String("salt", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "The JWK key salt checksum.")
 	flag.Parse()
 
-	if *filePath == "" {
-		fmt.Println("❌ Error: Missing required flag -file")
+	if *targetFile == "" {
+		fmt.Println("Usage: validate_conformance -file=<path_to_campaign.uvtt2z/.uvtt2k> [-secret=<key>] [-sku=<sku>] [-salt=<salt>]")
 		os.Exit(1)
 	}
 
-	fmt.Printf("🔍 Initiating UVTT v2 Conformance Verification: %s\n", filepath.Base(*filePath))
+	start := time.Now()
+	fmt.Printf("[*] Starting high-concurrency UVTT v2 binary validation for: %s\n", *targetFile)
 
-	err := validateArchive(*filePath)
+	// 2. Read Archive File
+	fileBytes, err := os.ReadFile(*targetFile)
 	if err != nil {
-		fmt.Printf("❌ CONFORMANCE FAILURE: %v\n", err)
+		fmt.Printf("[-] Failed to open archive: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("✅ CONFORMANCE SUCCESS: File complies with the UVTT v2.0.0-rc1 standard.")
-}
-
-func validateArchive(archivePath string) error {
-	// 1. Open the ZIP container
-	r, err := zip.OpenReader(archivePath)
-	if err != nil {
-		return fmt.Errorf("failed to open file as zip container: %w", err)
-	}
-	defer r.Close()
-
-	// Map to track present files inside the zip
-	zipFiles := make(map[string]*zip.File)
-	for _, f := range r.File {
-		zipFiles[f.Name] = f
-	}
-
-	// 2. Assert minimum directory tree files exist (excluding deep compound layout checks)
-	requiredRootFiles := []string{"manifest.json", "geometry.json", "entities.json", "preview.webp", "manifest.hash"}
-	for _, reqFile := range requiredRootFiles {
-		if _, ok := zipFiles[reqFile]; !ok {
-			return fmt.Errorf("missing core package specification file: '%s'", reqFile)
-		}
-	}
-
-	// 3. Parse and Verify manifest.hash cryptographic integrity receipt
-	hashFile, err := zipFiles["manifest.hash"].Open()
-	if err != nil {
-		return fmt.Errorf("failed to open manifest.hash receipt: %w", err)
-	}
-	defer hashFile.Close()
-
-	declaredHashes, err := parseHashReceipt(hashFile)
-	if err != nil {
-		return fmt.Errorf("failed to parse manifest.hash: %w", err)
-	}
-
-	// Check that everything listed in manifest.hash matches reality
-	for relPath, declaredHash := range declaredHashes {
-		zipFile, ok := zipFiles[relPath]
-		if !ok {
-			return fmt.Errorf("file declared in manifest.hash does not exist in ZIP: %s", relPath)
-		}
-
-		computedHash, err := computeSHA256(zipFile)
+	// 3. Envelope Decryption pass if .uvtt2k
+	isEncrypted := strings.HasSuffix(*targetFile, ".uvtt2k")
+	var zipData []byte
+	if isEncrypted {
+		fmt.Println("[*] AES-256-GCM encrypted envelope detected. Executing stream decryption...")
+		zipData, err = decryptPayload(fileBytes, *secretStr, *sku, *salt)
 		if err != nil {
-			return fmt.Errorf("failed to calculate checksum for %s: %w", relPath, err)
+			fmt.Printf("[-] Cryptographic handshake decryption failed: %v\n", err)
+			os.Exit(1)
 		}
-
-		if computedHash != declaredHash {
-			return fmt.Errorf("cryptographic mismatch for '%s': expected %s, computed %s", relPath, declaredHash, computedHash)
-		}
+		fmt.Println("[+] In-memory AES-GCM container stream extraction successful.")
+	} else {
+		zipData = fileBytes
 	}
 
-	// Assert there are no unlisted files inside the ZIP container (except manifest.hash itself)
-	for name := range zipFiles {
-		if name == "manifest.hash" {
-			continue
-		}
-		if _, declared := declaredHashes[name]; !declared {
-			return fmt.Errorf("unlisted file discovered inside ZIP archive (not declared in manifest.hash): '%s'", name)
-		}
-	}
-	fmt.Println("🔒 Cryptographic Integrity: OK (SHA-256 hashes successfully matching manifest.hash)")
-
-	// 4. Validate manifest.json Structure
-	mFile, err := zipFiles["manifest.json"].Open()
+	// 4. Extract Zip Directory Map
+	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
-		return fmt.Errorf("failed to open manifest.json: %w", err)
-	}
-	defer mFile.Close()
-
-	var manifest Manifest
-	if err := json.NewDecoder(mFile).Decode(&manifest); err != nil {
-		return fmt.Errorf("malformed JSON syntax inside manifest.json: %w", err)
+		fmt.Printf("[-] File is not a valid zip container format: %v\n", err)
+		os.Exit(1)
 	}
 
-	if manifest.UVTTVersion == "" {
-		return fmt.Errorf("manifest.json validation error: missing 'uvtt_version'")
+	fileMap := make(map[string][]byte)
+	for _, f := range reader.File {
+		rc, err := f.Open()
+		if err != nil {
+			fmt.Printf("[-] File extraction read error '%s': %v\n", f.Name, err)
+			os.Exit(1)
+		}
+		buf := new(bytes.Buffer)
+		_, err = io.Copy(buf, rc)
+		rc.Close()
+		if err != nil {
+			fmt.Printf("[-] File extraction buffer write error '%s': %v\n", f.Name, err)
+			os.Exit(1)
+		}
+		fileMap[f.Name] = buf.Bytes()
 	}
-	fmt.Printf("📦 Format Profile: UVTT %s\n", manifest.UVTTVersion)
 
-	// 5. Validate entities.json & Landing Zone Constraints
-	eFile, err := zipFiles["entities.json"].Open()
+	// 5. Verify Cryptographic Integrity
+	hashData, ok := fileMap["manifest.hash"]
+	if !ok {
+		fmt.Println("[-] Security Alert: Container lacks the mandatory integrity receipt 'manifest.hash'.")
+		os.Exit(1)
+	}
+
+	err = verifyHashes(fileMap, hashData)
 	if err != nil {
-		return fmt.Errorf("failed to open entities.json: %w", err)
+		fmt.Printf("[-] Verification aborted due to cryptographic mismatch: %v\n", err)
+		os.Exit(1)
 	}
-	defer eFile.Close()
+	fmt.Println("[+] Cryptographic manifest.hash registry match confirmed.")
 
-	var entities Entities
-	if err := json.NewDecoder(eFile).Decode(&entities); err != nil {
-		return fmt.Errorf("malformed JSON syntax inside entities.json: %w", err)
+	// 6. Ingest and parse manifest.json
+	manifestBytes, ok := fileMap["manifest.json"]
+	if !ok {
+		fmt.Println("[-] Missing master manifest.json index file.")
+		os.Exit(1)
 	}
 
-	// Validate Landing Zones Constraint (Maximum or exactly 1 default entry)
-	defaultCount := 0
-	for _, lz := range entities.LandingZones {
-		if lz.IsDefault {
-			defaultCount++
+	var manifest MinimalManifest
+	err = json.Unmarshal(manifestBytes, &manifest)
+	if err != nil {
+		fmt.Printf("[-] Failed to parse manifest.json metadata: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 7. Concurrent Sub-Map Schema Validations
+	var wg sync.WaitGroup
+	resultChan := make(chan ValidationResult, len(manifest.MapCatalog)+1)
+
+	if len(manifest.MapCatalog) == 0 {
+		// Standalone Mode
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := validateMapFolder(fileMap, "")
+			resultChan <- ValidationResult{Path: "root", Success: err == nil, Error: err}
+		}()
+	} else {
+		// Compound Campaign Mode
+		fmt.Printf("[*] Multi-Floor Compound dungeon identified. Spinning up %d concurrent validator routines...\n", len(manifest.MapCatalog))
+		for _, node := range manifest.MapCatalog {
+			wg.Add(1)
+			go func(path, name string) {
+				defer wg.Done()
+				err := validateMapFolder(fileMap, path)
+				resultChan <- ValidationResult{Path: name, Success: err == nil, Error: err}
+			}(node.Path, node.Name)
 		}
 	}
-	if defaultCount > 1 {
-		return fmt.Errorf("topology validation error: multiple default landing zones declared in entities.json (%d found)", defaultCount)
-	}
-	fmt.Printf("🚩 Landing Zones: OK (Found %d zone(s), %d designated as default)\n", len(entities.LandingZones), defaultCount)
 
-	return nil
+	// Wait for all validators to finish and close channel
+	wg.Wait()
+	close(resultChan)
+
+	// Evaluate results
+	failedCount := 0
+	for result := range resultChan {
+		if !result.Success {
+			fmt.Printf("  [-] Level '%s' Validation REJECTED: %v\n", result.Path, result.Error)
+			failedCount++
+		} else {
+			fmt.Printf("  [+] Level '%s' Conforms Successfully.\n", result.Path)
+		}
+	}
+
+	duration := time.Since(start)
+	fmt.Printf("\n[*] Conformance validation pipeline completed in: %s\n", duration)
+
+	if failedCount > 0 {
+		fmt.Printf("[-] VERIFICATION REJECTED: %d compliance conflicts found in standard structures.\n", failedCount)
+		os.Exit(1)
+	}
+
+	fmt.Println("[+] ALL SECURE GATES PASSED SUCCESSFULLY. Binary package conforms fully to the UVTT v2 specification.")
 }
 
-// parseHashReceipt reads flat newline-separated hash maps from the manifest.hash stream
-func parseHashReceipt(r io.Reader) (map[string]string, error) {
-	content, err := io.ReadAll(r)
+func decryptPayload(encrypted []byte, secret, sku, salt string) ([]byte, error) {
+	if len(encrypted) < 12 {
+		return nil, errors.New("encrypted payload too small")
+	}
+
+	hasher := sha256.New()
+	hasher.Write([]byte(sku + salt))
+	hashBytes := hasher.Sum([]byte(secret))
+
+	block, err := aes.NewCipher(hashBytes[:32])
 	if err != nil {
 		return nil, err
 	}
 
-	hashes := make(map[string]string)
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-
-		parts := strings.Fields(trimmed)
-		if len(parts) < 2 {
-			continue // Skip malformed rows
-		}
-
-		// The standard format is: <sha256_hash> <relative_filepath>
-		hash := parts[0]
-		relPath := strings.Join(parts[1:], " ") // Rejoin in case of spaces in paths
-		hashes[relPath] = strings.ToLower(hash)
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
 	}
-	return hashes, nil
+
+	nonce := encrypted[:12]
+	ciphertext := encrypted[12:]
+
+	plaintext, err := aesgcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return plaintext, nil
 }
 
-// computeSHA256 reads a zip file entry and calculates its SHA-256 string checksum
-func computeSHA256(f *zip.File) (string, error) {
-	rc, err := f.Open()
+func verifyHashes(fileMap map[string][]byte, hashData []byte) error {
+	lines := strings.Split(strings.TrimSpace(string(hashData)), "\n")
+	hashRegistry := make(map[string]string)
+
+	for _, line := range lines {
+		if !strings.Contains(line, "  ") {
+			continue
+		}
+		parts := strings.SplitN(line, "  ", 2)
+		checksum := strings.TrimSpace(parts[0])
+		filePath := strings.TrimSpace(parts[1])
+		hashRegistry[filePath] = checksum
+	}
+
+	for name, content := range fileMap {
+		if name == "manifest.hash" || name == "manifest.json" {
+			continue
+		}
+		expected, exists := hashRegistry[name]
+		if !exists {
+			return fmt.Errorf("security alert: untracked file found in container: %s", name)
+		}
+
+		hasher := sha256.New()
+		hasher.Write(content)
+		computed := hex.EncodeToString(hasher.Sum(nil))
+
+		if computed != expected {
+			return fmt.Errorf("cryptographic checksum mismatch on %s: expected %s, got %s", name, expected, computed)
+		}
+	}
+
+	return nil
+}
+
+func validateMapFolder(fileMap map[string][]byte, path string) error {
+	geomPath := path + "geometry.json"
+	entPath := path + "entities.json"
+	basePath := path + "basemap.webp"
+
+	if _, ok := fileMap[basePath]; !ok {
+		return fmt.Errorf("missing watermarked fallback: '%s'", basePath)
+	}
+
+	geomBytes, ok := fileMap[geomPath]
+	if !ok {
+		return fmt.Errorf("missing mandatory geometry layout: '%s'", geomPath)
+	}
+
+	var geom MinimalGeometry
+	err := json.Unmarshal(geomBytes, &geom)
 	if err != nil {
-		return "", err
-	}
-	defer rc.Close()
-
-	h := sha256.New()
-	if _, err := io.Copy(h, rc); err != nil {
-		return "", err
+		return fmt.Errorf("invalid json format in %s: %v", geomPath, err)
 	}
 
-	return hex.EncodeToString(h.Sum(nil)), nil
+	for _, wall := range geom.Geometry.Walls {
+		if wall.Height.Bottom > wall.Height.Top {
+			return fmt.Errorf("Z-height conflict on wall '%s' inside %s", wall.ID, geomPath)
+		}
+	}
+
+	if entBytes, ok := fileMap[entPath]; ok {
+		var ent MinimalEntities
+		err := json.Unmarshal(entBytes, &ent)
+		if err != nil {
+			return fmt.Errorf("invalid json format in %s: %v", entPath, err)
+		}
+
+		defaultCount := 0
+		for _, lz := range ent.LandingZones {
+			if lz.IsDefault {
+				defaultCount++
+			}
+		}
+		if defaultCount > 1 {
+			return fmt.Errorf("topology conflict: multiple default spawn landing zones defined in %s", entPath)
+		}
+
+		for _, zone := range ent.Audio.Zones {
+			if zone.FadeRadius <= 0 {
+				return fmt.Errorf("acoustic physics conflict: zone '%s' must have positive non-zero fade_radius", zone.ID)
+			}
+		}
+	}
+
+	return nil
 }

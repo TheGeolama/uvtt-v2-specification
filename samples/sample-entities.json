@@ -4,7 +4,11 @@
     {
       "id": "light_flickering_torch",
       "type": "directional",
-      "position": { "x": 15.0, "y": 12.0, "z": 6.5 },
+      "position": {
+        "x": 15.0,
+        "y": 12.0,
+        "z": 6.5
+      },
       "color": "#f97316",
       "bright_radius": 15.0,
       "dim_radius": 30.0,
@@ -25,7 +29,10 @@
       "id": "lz_surface_stair_arrival",
       "name": "Stairwell Spawn",
       "is_default": true,
-      "coordinates": [12.0, 14.5],
+      "coordinates": [
+        12.0,
+        14.5
+      ],
       "heading_degrees": 90.0,
       "properties": {
         "description": "Arrival point descending from the castle ruins.",
@@ -40,15 +47,30 @@
       "trigger_bounds": {
         "shape": "polygon",
         "points": [
-          { "x": 45.0, "y": 30.0 },
-          { "x": 47.0, "y": 30.0 },
-          { "x": 47.0, "y": 32.0 },
-          { "x": 45.0, "y": 32.0 }
+          {
+            "x": 45.0,
+            "y": 30.0
+          },
+          {
+            "x": 47.0,
+            "y": 30.0
+          },
+          {
+            "x": 47.0,
+            "y": 32.0
+          },
+          {
+            "x": 45.0,
+            "y": 32.0
+          }
         ]
       },
       "conditions": {
         "requires_interaction": false,
-        "allowed_modes": ["walking", "running"]
+        "allowed_modes": [
+          "walking",
+          "running"
+        ]
       },
       "destination": {
         "type": "inter_map",
@@ -62,7 +84,10 @@
       "type": "teleport",
       "trigger_bounds": {
         "shape": "circle",
-        "center": { "x": 12.0, "y": 14.5 },
+        "center": {
+          "x": 12.0,
+          "y": 14.5
+        },
         "radius": 1.5
       },
       "conditions": {
@@ -76,9 +101,45 @@
       },
       "portal_dependency": {
         "portal_id": "portal_trapdoor_ground_floor",
-        "allowed_states": ["open", "broken"],
+        "allowed_states": [
+          "open",
+          "broken"
+        ],
         "lock_feedback_message": "The heavy iron-bound trapdoor is firmly shut."
       }
+    },
+    {
+      "id": "trigger_pressure_plate_trap",
+      "type": "trap",
+      "trigger_bounds": {
+        "shape": "circle",
+        "center": {
+          "x": 22.0,
+          "y": 30.0
+        },
+        "radius": 1.0
+      },
+      "conditions": {
+        "requires_interaction": false,
+        "allowed_modes": [
+          "walking",
+          "running"
+        ],
+        "is_active": true
+      },
+      "destination": {
+        "type": "intra_map",
+        "uri": "internal://same_floor#lz_surface_stair_arrival",
+        "prediction_trigger_radius": 0.0
+      },
+      "actions": [
+        {
+          "target_id": "wall_illusory_stone",
+          "action_type": "set_property",
+          "property": "visibility",
+          "value": "visible"
+        }
+      ]
     }
   ],
   "audio": {
@@ -86,7 +147,10 @@
       {
         "id": "acoustic_water_dripping",
         "shape": "circle",
-        "center": { "x": 22.4, "y": 18.1 },
+        "center": {
+          "x": 22.4,
+          "y": 18.1
+        },
         "radius": 4.0,
         "fade_radius": 6.0,
         "volume_max": 0.85,
@@ -103,10 +167,22 @@
       "bounds": {
         "shape": "polygon",
         "points": [
-          { "x": 0.0, "y": 0.0 },
-          { "x": 100.0, "y": 0.0 },
-          { "x": 100.0, "y": 100.0 },
-          { "x": 0.0, "y": 100.0 }
+          {
+            "x": 0.0,
+            "y": 0.0
+          },
+          {
+            "x": 100.0,
+            "y": 0.0
+          },
+          {
+            "x": 100.0,
+            "y": 100.0
+          },
+          {
+            "x": 0.0,
+            "y": 100.0
+          }
         ]
       },
       "height": {
@@ -114,7 +190,7 @@
         "top": 40.0
       },
       "properties": {
-        "intensity": 0.80,
+        "intensity": 0.8,
         "speed": 4.5,
         "angle": 135.0,
         "color": "#ffffff",

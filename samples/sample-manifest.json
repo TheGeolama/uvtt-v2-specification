@@ -10,8 +10,8 @@
     "requires_compute_shaders": false
   },
   "encryption_handshake": {
-    "clearinghouse_url": "https://licensing.retailer.com/v1/drm/handshake",
-    "license_authority": "https://auth.retailer.com/.well-known/jwks.json",
+    "clearinghouse_url": "https://licensing.universalvtt.org/v1/drm/handshake",
+    "license_authority": "https://auth.universalvtt.org/.well-known/jwks.json",
     "key_salt_checksum": "a4d39f772b15e45a1f298cd310ba2dfc"
   },
   "environment": {
@@ -29,7 +29,7 @@
     },
     "ambience": {
       "uri": "assets/global_storm_loop.ogg",
-      "volume": 0.40
+      "volume": 0.4
     }
   },
   "map_catalog": [
@@ -40,5 +40,12 @@
       "path": "maps/upper_labyrinth/",
       "z_index": 0
     }
-  ]
+  ],
+  "extensions": {
+    "foundryvtt": {
+      "version": "1.0.0",
+      "grid_color": "#ff000088",
+      "ambient_fog_color": "#111122"
+    }
+  }
 }

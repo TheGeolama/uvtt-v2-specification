@@ -1,0 +1,6 @@
+# Open Virtual Tabletop Consortium Security Contact
+Contact: mailto:security@universalvtt.org
+Canonical: https://universalvtt.org/.well-known/security.txt
+Policy: https://github.com/TheGeolama/uvtt-v2-specification/blob/main/SECURITY.md
+Preferred-Languages: en
+Expires: 2027-12-31T23:59:59.000Z

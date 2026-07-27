@@ -1,0 +1,92 @@
+{
+  "format_version": "2.0.0",
+  "package_type": "asset_pack",
+  "pack_name": "Tavern & Firelight Essentials Pack",
+  "author": "TheGeolama Assets",
+  "version": "1.0.0",
+  "assets": {
+    "audio": [
+      {
+        "id": "audio-loop-fireplace-crackling",
+        "file": "assets/audio/fire_crackle.ogg",
+        "name": "Fireplace Crackling SFX Loop",
+        "default_volume": 0.8,
+        "is_loop": true,
+        "tags": [
+          "fire",
+          "ambient",
+          "sfx",
+          "loop"
+        ]
+      }
+    ],
+    "tokens": [
+      {
+        "id": "token-tavern-owner-bard",
+        "file": "assets/tokens/tavern_owner.webp",
+        "name": "Tavern Owner Bard (Male)",
+        "grid_footprint": {
+          "width_in_grids": 1.0,
+          "height_in_grids": 1.0
+        },
+        "tags": [
+          "token",
+          "actor",
+          "npc",
+          "bard",
+          "owner"
+        ]
+      }
+    ],
+    "props": [
+      {
+        "id": "prop-interactive-hearth-campfire",
+        "file": "assets/props/hearth_campfire.webp",
+        "name": "Roaring Stone Hearth Campfire Prop",
+        "default_scale": 100.0,
+        "grid_footprint": {
+          "width_in_grids": 2.0,
+          "height_in_grids": 2.0
+        },
+        "tags": [
+          "prop",
+          "furniture",
+          "light",
+          "sfx",
+          "emitter"
+        ],
+        "auto_emits": [
+          {
+            "type": "light",
+            "color": "#f97316",
+            "bright_radius": 5.0,
+            "dim_radius": 10.0,
+            "decay": "inverse_square",
+            "animation": {
+              "type": "flicker",
+              "speed": 1.2,
+              "intensity_variance": 0.2
+            }
+          },
+          {
+            "type": "audio",
+            "audio_uri": "assets/audio/fire_crackle.ogg",
+            "volume_max": 0.8,
+            "fade_radius": 6.0,
+            "muffled_by_geometry": true
+          },
+          {
+            "type": "emitter",
+            "emitter_type": "embers",
+            "properties": {
+              "intensity": 0.45,
+              "speed": 1.5,
+              "angle": 270.0,
+              "color": "#ff5500"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
