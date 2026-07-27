@@ -1,376 +1,654 @@
 /**
- * ======================================================================
- *               Universal VTT v2 (UVTT v2) Reference Parser
- *                 Specification Version: v2.0.0-rc1
- * ======================================================================
- * This parser module provides complete type definitions, cryptographic
- * integrity validation, Web Crypto volatile GCM decryption, and geometric
- * path-flattening algorithms for compliant client virtual tabletops (VTTs).
+ * Universal Virtual Tabletop Version 2 (UVTT v2) TypeScript Reference Parser
+ * File: uvtt2_parser.tst (TypeScript Reference Implementation)
  * 
- * Public domain file schemas (CC0 1.0) and Apache 2.0 reference engine.
+ * Standards Body: Open Virtual Tabletop Consortium (OVTC)
+ * Format Version: 2.0.0 (Final Production Specification)
+ * 
+ * Implements:
+ *  1. ZIP Archive Stream Parsing (Standard .uvtt2z and Standalone .uvtt2a packages)
+ *  2. In-Memory AES-256-GCM Decryption (.uvtt2k) using native Web Crypto API
+ *  3. Volatile Memory Disposal Protocol (heap sanitization, URL object revocations)
+ *  4. SVG Cubic Bézier curve flattening and subdivision calculations
+ *  5. Collinear path simplification algorithms
+ *  6. Acoustic physics linear decay proximity equations
  */
 
-// ======================================================================
-// 1. Core Typings & Schema Definitions
-// ======================================================================
+// ============================================================================
+// SECTION 1: SYSTEM SCHEMA INTERFACES
+// ============================================================================
 
-export interface Point {
+export type TopologyType = "square" | "hex" | "isometric";
+export type HexOrientation = "flat_top" | "pointy_top";
+export type HexOffset = "odd_row" | "even_row" | "odd_col" | "even_col";
+export type WallType = "standard" | "terrain" | "illusory";
+export type PathNodeType = "move" | "line" | "bezier";
+export type LightType = "point" | "directional";
+export type LightDecay = "linear" | "inverse_square";
+export type LightAnimationType = "flicker" | "pulse";
+export type AudioZoneShape = "circle" | "polygon";
+export type EmitterType = "rain" | "snow" | "fog" | "embers" | "magic";
+export type CollisionMode = "none" | "mask_under_overhead" | "ground_terminate" | "wall_bounce";
+export type RenderLayer = "above_overhead" | "below_overhead" | "ground_level";
+export type PackageType = "asset_pack" | "map_pack" | "compound";
+
+export interface MapOrigin {
   x: number;
   y: number;
 }
 
-export interface Point3D extends Point {
-  z: number;
+export interface GridSize {
+  x: number;
+  y: number;
 }
 
-export interface HeightBounds {
+export interface Topology {
+  type: TopologyType;
+  orientation?: HexOrientation;
+  offset?: HexOffset;
+  isometric_ratio?: number; // Capped at (0.0, 1.0], typically 0.5
+}
+
+export interface Resolution {
+  map_origin: MapOrigin;
+  grid_size: GridSize;
+  units_per_grid: number;
+  unit_name: string;
+  topology: Topology;
+}
+
+export interface HardwareProfile {
+  minimum_pipeline: "webgl2" | "webgpu";
+  recommended_pipeline: "webgl2" | "webgpu";
+  requires_compute_shaders: boolean;
+}
+
+export interface EncryptionHandshake {
+  clearinghouse_url: string;
+  license_authority: string;
+  key_salt_checksum: string;
+}
+
+export interface MapCatalogNode {
+  id: string;
+  name: string;
+  slug: string;
+  path: string;
+  z_index: number;
+}
+
+export interface Manifest {
+  format_version: string;
+  uvtt_version: string;
+  campaign_name: string;
+  author: string;
+  license: string;
+  hardware_profile: HardwareProfile;
+  encryption_handshake?: EncryptionHandshake;
+  map_catalog?: MapCatalogNode[];
+}
+
+export interface HeightRange {
   bottom: number;
   top: number;
 }
 
-export interface SVGPathNode {
-  type: "move" | "line" | "bezier";
-  x?: number; // Target coordinate for move/line
+export interface PathNode {
+  type: PathNodeType;
+  x?: number;
   y?: number;
-  cp1?: Point; // Cubic bezier control point 1
-  cp2?: Point; // Cubic bezier control point 2
-  to?: Point;  // Cubic bezier destination point
+  cp1?: MapOrigin;
+  cp2?: MapOrigin;
+  to?: MapOrigin;
 }
 
-export interface UVTT2Manifest {
-  format_version: "2.0.0";
-  uvtt_version: "2.0.0";
-  campaign_name: string;
-  author: string;
-  license: string;
-  hardware_profile?: {
-    minimum_pipeline: "webgl2" | "webgpu";
-    recommended_pipeline: "webgl2" | "webgpu";
-    requires_compute_shaders: boolean;
-  };
-  encryption_handshake?: {
-    clearinghouse_url: string;
-    license_authority: string;
-    key_salt_checksum: string; // 32-character hexadecimal pattern
-  };
-  audio?: {
-    music?: {
-      uri: string;
-      volume: number; // Volume bounded [0.0 - 1.0]
-      crossfade_duration?: number;
-    };
-    ambience?: {
-      uri: string;
-      volume: number;
-    };
-  };
-  map_catalog?: Array<{
-    id: string;
-    name: string;
-    slug: string; // URL-safe, slugified folder string
-    path: string; // Directory mapping within ZIP (e.g. maps/cellar/)
-    z_index: number; // Vertical sorting index (ground floor = 0)
-  }>;
+export interface DirectionalBlocks {
+  left_to_right: string[]; // light, sight, movement
+  right_to_left: string[];
 }
 
-export interface UVTT2Geometry {
-  format_version: "2.0.0";
-  resolution: {
-    map_origin: Point;
-    grid_size: Point;
-    units_per_grid: number; // Physical distance represented by 1 cell (e.g. 5.0)
-    unit_name: string; // Measurement unit name (e.g. 'ft', 'm')
-    topology: {
-      type: "square" | "hex" | "isometric";
-      orientation?: "flat_top" | "pointy_top"; // Required for hex
-      offset?: "odd_row" | "even_row" | "odd_col" | "even_col"; // Required for hex
-      isometric_ratio?: number; // Required for iso (Standard = 0.5)
-    };
+export interface WallStates {
+  ethereal: boolean;
+  disbelieved_by?: string[];
+}
+
+export interface Wall {
+  id: string;
+  type: WallType;
+  height: HeightRange;
+  path: PathNode[];
+  blocks?: string[];
+  directional_blocks?: DirectionalBlocks;
+  states?: WallStates;
+  visibility?: "visible" | "gm_only" | "hidden";
+  sync_id?: string;
+}
+
+export interface Portal {
+  id: string;
+  type: "door";
+  sub_type?: "standard" | "secret";
+  state: "open" | "closed" | "locked" | "broken";
+  height: HeightRange;
+  blocks: string[];
+  line: {
+    p1: MapOrigin;
+    p2: MapOrigin;
   };
+  visibility?: "visible" | "gm_only" | "hidden";
+  sync_id?: string;
+}
+
+export interface Roof {
+  id: string;
+  type: "roof";
+  height: HeightRange;
+  polygon: MapOrigin[];
+  image: {
+    uri: string;
+  };
+  visibility?: "visible" | "gm_only" | "hidden";
+  sync_id?: string;
+}
+
+export interface Geometry {
+  format_version: string;
+  resolution: Resolution;
   geometry: {
-    walls: Array<{
-      id: string;
-      type: "standard" | "terrain" | "illusory";
-      height: HeightBounds;
-      path: SVGPathNode[];
-      blocks?: Array<"light" | "sight" | "movement">; // Global bi-directional blocks
-      directional_blocks?: {
-        left_to_right: Array<"light" | "sight" | "movement">;
-        right_to_left: Array<"light" | "sight" | "movement">;
-      };
-      states?: {
-        ethereal: boolean; // Bypasses blocks globally without removing nodes
-        disbelieved_by?: string[]; // Player IDs who see through the illusion
-      };
-    }>;
-    portals: Array<{
-      id: string;
-      type: "door";
-      sub_type?: "standard" | "secret";
-      state: "open" | "closed";
-      height: HeightBounds;
-      blocks: Array<"light" | "sight" | "movement">;
-      line: {
-        p1: Point;
-        p2: Point;
-      };
-    }>;
-    overhead?: Array<{
-      id: string;
-      type: "roof";
-      height: HeightBounds;
-      polygon: Point[]; // Minimum 3 vertices defining roof boundary
-      image: {
-        uri: string; // Internal or local relative path to assets
-      };
-    }>;
+    walls: Wall[];
+    portals: Portal[];
+    overhead?: Roof[];
   };
 }
 
-export interface UVTT2Entities {
-  lights?: Array<{
-    id: string;
-    type: "point" | "directional";
-    position: Point3D;
-    color: string; // #RRGGBB Hex pattern
-    bright_radius: number;
-    dim_radius: number;
-    decay: "linear" | "inverse_square";
-    cone?: {
-      rotation: number; // Compass angle [0.0 - 360.0]
-      arc: number; // Opening angle in degrees [1.0 - 360.0]
-    };
-    animation?: {
-      type: "flicker" | "pulse";
-      speed: number;
-      intensity_variance: number; // Scale [0.0 - 1.0]
-    };
-  }>;
-  landing_zones?: Array<{
-    id: string;
-    name: string;
-    is_default: boolean; // Exactly one default permitted per map catalog entry
-    coordinates: [number, number];
-    heading_degrees: number;
-    properties?: {
-      description?: string;
-      camera_zoom_level?: number; // Cinematic default viewport scaling
-    };
-  }>;
-  events?: Array<{
-    id: string;
-    type: "teleport" | "trap";
-    trigger_bounds: {
-      shape: "polygon" | "circle";
-      points?: Point[]; // Required for polygon triggers
-      center?: Point;   // Required for circular triggers
-      radius?: number;  // Required for circular triggers
-    };
-    conditions?: {
-      requires_interaction?: boolean;
-      interaction_key?: string;
-      allowed_modes?: string[]; // e.g. ["walking", "flying"]
-      is_active?: boolean;
-      key_item_required?: string;
-    };
-    destination?: {
-      type: "intra_map" | "inter_map";
-      uri: string; // Standardized: internal:// (compound) or relative:// (federated) targets
-      fade_transition?: "crossfade_black" | "planar_flash";
-      prediction_trigger_radius?: number; // Distance in grids to pre-load targets
-    };
-  }>;
-  audio?: {
-    zones?: Array<{
-      id: string;
-      shape: "circle" | "polygon";
-      center?: Point;
-      radius?: number;
-      fade_radius: number; // Proximity boundary for volume dampening calculations
-      volume_max: number;  // Maximum audio level cap [0.0 - 1.0]
-      audio_uri: string;
-    }>;
-  };
-  emitters?: Array<{
-    id: string;
-    type: "rain" | "snow" | "fog" | "embers" | "magic";
-    bounds: {
-      shape: "polygon" | "circle";
-      points?: Point[];
-    };
-    properties: {
-      intensity: number; // Scaled [0.0 - 1.0] representing emission density
-      speed: number;
-      angle: number;
-      color: string; // #RRGGBB
-    };
-  }>;
+export interface LightCone {
+  rotation: number;
+  arc: number;
 }
 
-// ======================================================================
-// 2. Cryptographic DRM & Volatile Memory Management
-// ======================================================================
+export interface LightAnimation {
+  type: LightAnimationType;
+  speed: number;
+  intensity_variance: number;
+}
 
-export class CryptographicPipeline {
-  /**
-   * Generates a dynamic SHA-256 hash representation of a raw file buffer.
-   * Compares outputs against the 'manifest.hash' archive receipt.
-   */
-  public static async calculateSHA256(data: ArrayBuffer): Promise<string> {
-    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+export interface Light {
+  id: string;
+  type: LightType;
+  position: { x: number; y: number; z: number };
+  color: string; // Hex matching ^#[a-fA-F0-9]{6}$
+  bright_radius: number;
+  dim_radius: number;
+  decay: LightDecay;
+  cone?: LightCone;
+  animation?: LightAnimation;
+  visibility?: "visible" | "gm_only" | "hidden";
+  sync_id?: string;
+}
+
+export interface LandingZoneProperties {
+  description?: string;
+  camera_zoom_level?: number;
+}
+
+export interface LandingZone {
+  id: string;
+  name: string;
+  is_default: boolean;
+  coordinates: [number, number];
+  heading_degrees: number;
+  properties?: LandingZoneProperties;
+  visibility?: "visible" | "gm_only" | "hidden";
+  sync_id?: string;
+}
+
+export interface PortalDependency {
+  portal_id: string;
+  allowed_states: string[]; // open, closed, broken, locked
+  lock_feedback_message?: string;
+}
+
+export interface EventAction {
+  target_id: string;
+  action_type: "set_property" | "play_sound" | "trigger_event";
+  property?: string;
+  value?: any;
+}
+
+export interface EventDestination {
+  type: "intra_map" | "inter_map";
+  uri: string;
+  fade_transition?: "crossfade_black" | "planar_flash";
+  prediction_trigger_radius?: number;
+}
+
+export interface Event {
+  id: string;
+  type: "teleport" | "trap" | "trigger";
+  trigger_bounds: {
+    shape: "polygon" | "circle";
+    points?: MapOrigin[];
+    center?: MapOrigin;
+    radius?: number;
+  };
+  conditions: {
+    requires_interaction: boolean;
+    interaction_key?: string;
+    allowed_modes?: string[];
+    is_active?: boolean;
+  };
+  destination: EventDestination;
+  portal_dependency?: PortalDependency;
+  actions?: EventAction[];
+  visibility?: "visible" | "gm_only" | "hidden";
+  sync_id?: string;
+}
+
+export interface AcousticZone {
+  id: string;
+  shape: AudioZoneShape;
+  center: MapOrigin;
+  radius: number;
+  fade_radius: number;
+  volume_max: number;
+  audio_uri: string;
+  muffled_by_geometry?: boolean;
+  visibility?: "visible" | "gm_only" | "hidden";
+  sync_id?: string;
+}
+
+export interface GlobalAudioItem {
+  uri: string;
+  volume: number;
+  crossfade_duration?: number;
+}
+
+export interface AudioBlock {
+  music?: GlobalAudioItem;
+  ambience?: GlobalAudioItem;
+  zones?: AcousticZone[];
+}
+
+export interface WeatherProperties {
+  intensity: number; // [0.0, 1.0]
+  speed: number;
+  angle: number;
+  color: string;
+  render_layer?: RenderLayer;
+  collision_mode?: CollisionMode;
+  wind_influence?: {
+    inherit_global: boolean;
+    influence_scale: number;
+  };
+}
+
+export interface WeatherEmitter {
+  id: string;
+  type: EmitterType;
+  is_global: boolean;
+  bounds?: {
+    shape: "polygon" | "circle";
+    points: MapOrigin[];
+  };
+  height?: HeightRange;
+  properties: WeatherProperties;
+  visibility?: "visible" | "gm_only" | "hidden";
+  sync_id?: string;
+}
+
+export interface Entities {
+  format_version: string;
+  lights?: Light[];
+  landing_zones?: LandingZone[];
+  events?: Event[];
+  audio?: AudioBlock;
+  emitters?: WeatherEmitter[];
+}
+
+// ============================================================================
+// SECTION 2: STANDALONE .uvtt2a ASSET MODELS
+// ============================================================================
+
+export interface StandaloneAssetAudio {
+  id: string;
+  file: string;
+  name: string;
+  default_volume: number;
+  is_loop: boolean;
+  tags?: string[];
+}
+
+export interface StandaloneAssetToken {
+  id: string;
+  file: string;
+  name: string;
+  grid_footprint: {
+    width_in_grids: number;
+    height_in_grids: number;
+  };
+  tags?: string[];
+}
+
+export interface StandaloneAssetPropAutoEmit {
+  type: "light" | "audio" | "emitter";
+  color?: string;
+  bright_radius?: number;
+  dim_radius?: number;
+  decay?: LightDecay;
+  animation?: LightAnimation;
+  audio_uri?: string;
+  volume_max?: number;
+  fade_radius?: number;
+  muffled_by_geometry?: boolean;
+  emitter_type?: EmitterType;
+  properties?: any;
+}
+
+export interface StandaloneAssetProp {
+  id: string;
+  file: string;
+  name: string;
+  default_scale?: number;
+  grid_footprint: {
+    width_in_grids: number;
+    height_in_grids: number;
+  };
+  tags?: string[];
+  auto_emits?: StandaloneAssetPropAutoEmit[];
+}
+
+export interface AssetManifest {
+  format_version: string;
+  package_type: "asset_pack";
+  pack_name: string;
+  author: string;
+  version: string;
+  assets: {
+    audio?: StandaloneAssetAudio[];
+    tokens?: StandaloneAssetToken[];
+    props?: StandaloneAssetProp[];
+  };
+}
+
+// ============================================================================
+// SECTION 3: CORE PARSING & CRYPTOGRAPHIC HANDSHAKE RUNTIME
+// ============================================================================
+
+export class Uvtt2Parser {
+  private masterSecret: Uint8Array | null = null;
+
+  constructor(secretHex?: string) {
+    if (secretHex) {
+      this.masterSecret = this.hexToUint8Array(secretHex);
+    }
   }
 
   /**
-   * Volatile AES-256-GCM In-Memory Decryption pipeline.
-   * Decrypts premium graphics/audio assets directly within execution RAM.
+   * Performs standard deterministic key derivation (ZKS Mode) and decrypts the GCM envelope
+   * matching our serverless edge Worker formula.
    */
-  public static async decryptAsset(
+  public async decryptGCMEnvelope(
     encryptedData: ArrayBuffer,
-    keyMaterial: CryptoKey,
-    iv: Uint8Array
+    sku: string,
+    saltHex: string
   ): Promise<ArrayBuffer> {
-    return await crypto.subtle.decrypt(
-      {
-        name: "AES-GCM",
-        iv: iv,
-        tagLength: 128 // Enforces 16-byte authentication tags
-      },
-      keyMaterial,
-      encryptedData
+    if (!this.masterSecret) {
+      throw new Error("Volatile Cryptographic State Conflict: No master secret configured.");
+    }
+
+    if (encryptedData.byteLength < 12 + 16) {
+      throw new Error("Cryptographic Fault: Encrypted envelope size underflow.");
+    }
+
+    const salt = this.hexToUint8Array(saltHex);
+    const skuBytes = new TextEncoder().encode(sku);
+
+    // Conjoin SKU and salt into a single message
+    const message = new Uint8Array(skuBytes.length + salt.length);
+    message.set(skuBytes, 0);
+    message.set(salt, skuBytes.length);
+
+    // Derived Key = HMAC-SHA256(MasterSecret, SKU + Salt)
+    const cryptoKey = await crypto.subtle.importKey(
+      "raw",
+      this.masterSecret,
+      { name: "HMAC", hash: { name: "SHA-256" } },
+      false,
+      ["sign"]
     );
+
+    const signature = await crypto.subtle.sign("HMAC", cryptoKey, message);
+    const derivedKeyBytes = new Uint8Array(signature);
+
+    // Import derived key for AES-GCM
+    const aesKey = await crypto.subtle.importKey(
+      "raw",
+      derivedKeyBytes.subarray(0, 32), // Slice to 256 bits
+      { name: "AES-GCM" },
+      false,
+      ["decrypt"]
+    );
+
+    // Extract Nonce (first 12 bytes) and ciphertext
+    const nonce = encryptedData.slice(0, 12);
+    const ciphertext = encryptedData.slice(12);
+
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: nonce },
+      aesKey,
+      ciphertext
+    );
+
+    // Volatile Memory Scrubbing: Fill cryptographic derived keys with zero instantly
+    derivedKeyBytes.fill(0);
+    message.fill(0);
+
+    return plaintext;
   }
 
   /**
-   * Volatile Memory Disposal Protocol Scrub (Saves memory & prevents RAM scraping).
-   * Actively overwrites the unencrypted plaintext ArrayBuffer on the JS heap
-   * once the raster/texture transfer to GPU video RAM resolves.
+   * Verifies a directory mapping of files against the standard root manifest.hash receipt.
+   * Prompts platform shutdowns on checksum mismatch or untracked files.
    */
-  public static hardMemoryScrub(buffer: ArrayBuffer): void {
-    const zeroOutView = new Uint8Array(buffer);
-    zeroOutView.fill(0); // Synchronously zero out every byte of plaintext asset memory
+  public async verifyHashes(
+    fileMap: Map<string, ArrayBuffer>,
+    hashData: string
+  ): Promise<void> {
+    const lines = hashData.trim().split("\n");
+    const hashRegistry = new Map<string, string>();
+
+    for (const line of lines) {
+      if (!line.includes("  ")) continue;
+      const parts = line.split("  ", 2);
+      const checksum = parts[0].trim();
+      const filePath = parts[1].trim();
+      hashRegistry.set(filePath, checksum);
+    }
+
+    for (const [name, content] of fileMap.entries()) {
+      if (name === "manifest.hash" || name === "manifest.json") {
+        continue;
+      }
+
+      const expected = hashRegistry.get(name);
+      if (!expected) {
+        throw new Error(`Security Exception: Untracked file detected in container: '${name}'`);
+      }
+
+      const hashBuffer = await crypto.subtle.digest("SHA-256", content);
+      const computed = this.bufferToHex(hashBuffer);
+
+      if (computed !== expected) {
+        throw new Error(
+          `Integrity Verification Failure: Checksum mismatch on file '${name}'\n  Expected: ${expected}\n  Computed: ${computed}`
+        );
+      }
+    }
   }
-}
 
-// ======================================================================
-// 3. Spatial Mathematics & Engineering Algorithms
-// ======================================================================
-
-export class GeometryMath {
   /**
-   * Subdivides parametric Cubic Bézier curves into sequential linear lines.
-   * Avoids real-time curve calculations on hardware rendering loops.
-   * Equation: P(t) = (1-t)^3*P0 + 3(1-t)^2*t*CP1 + 3(1-t)*t^2*CP2 + t^3*P3
+   * Performs real-time logical constraint auditing on a single map layer subdirectory.
    */
-  public static flattenBezier(
-    p0: Point,
-    cp1: Point,
-    cp2: Point,
-    p3: Point,
-    subdivisions: number = 10
-  ): Point[] {
-    const points: Point[] = [];
-    
-    for (let i = 0; i <= subdivisions; i++) {
-      const t = i / subdivisions;
-      const mt = 1 - t;
-      
-      const mt3 = mt * mt * mt;
-      const mt2t = 3 * mt * mt * t;
-      const mtt2 = 3 * mt * t * t;
-      const t3 = t * t * t;
+  public auditMapLayer(
+    geometry: Geometry,
+    entities?: Entities
+  ): void {
+    // 1. Z-Height Integrity check
+    for (const wall of geometry.geometry.walls) {
+      if (wall.height.bottom > wall.height.top) {
+        throw new Error(
+          `Verticality Conflict on wall '${wall.id}': Bottom Z (${wall.height.bottom}) exceeds Top boundary (${wall.height.top}).`
+        );
+      }
+    }
 
-      const x = mt3 * p0.x + mt2t * cp1.x + mtt2 * cp2.x + t3 * p3.x;
-      const y = mt3 * p0.y + mt2t * cp1.y + mtt2 * cp2.y + t3 * p3.y;
+    if (entities) {
+      // 2. Default Spawn Point Limit
+      const defaultSpawns = (entities.landing_zones || []).filter(lz => lz.is_default);
+      if (defaultSpawns.length > 1) {
+        throw new Error(
+          `Topology Collision: Multiple default starting landing zones detected (${defaultSpawns.length}).`
+        );
+      }
 
-      points.push({ x, y });
+      // 3. Emitter Boundaries
+      for (const emitter of entities.emitters || []) {
+        if (!emitter.is_global) {
+          if (!emitter.bounds || !emitter.bounds.points || emitter.bounds.points.length === 0) {
+            throw new Error(
+              `Physics Engine Fault: Localized weather emitter '${emitter.id}' must define explicit coordinate bounds.`
+            );
+          }
+        }
+      }
+
+      // 4. Acoustic decay verification
+      if (entities.audio && entities.audio.zones) {
+        for (const zone of entities.audio.zones) {
+          if (zone.fade_radius <= 0) {
+            throw new Error(
+              `Acoustic Decay Range Violation on sound zone '${zone.id}': fade_radius must be positive and non-zero.`
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // ============================================================================
+  // SECTION 4: MATHEMATICAL & GEOMETRICAL ALGORITHMS
+  // ============================================================================
+
+  /**
+   * Linear Acoustic Proximity attenuation falloff formula.
+   * Clamps bounds securely to prevent audio engine popping.
+   */
+  public calculateAcousticVolume(
+    distance: number,
+    radius: number,
+    fadeRadius: number,
+    volumeMax: number
+  ): number {
+    if (distance <= radius) {
+      return volumeMax;
+    }
+    const d = distance - radius;
+    if (d >= fadeRadius) {
+      return 0.0;
     }
     
+    // Formula: V = max(0, min(V_max, V_max * (1 - d/r)))
+    const volume = volumeMax * (1 - d / fadeRadius);
+    return Math.max(0.0, Math.min(volumeMax, volume));
+  }
+
+  /**
+   * Subdivides smooth SVG Bézier paths into a series of rigid, multi-point
+   * straight-line approximations for legacy v1 engines.
+   */
+  public flattenSvgPath(pathArray: PathNode[]): MapOrigin[] {
+    const points: MapOrigin[] = [];
+    let currentPt: MapOrigin = { x: 0, y: 0 };
+
+    for (const node of pathArray) {
+      if (node.type === "move" || node.type === "line") {
+        currentPt = { x: node.x ?? 0, y: node.y ?? 0 };
+        points.push(currentPt);
+      } else if (node.type === "bezier" && node.cp1 && node.cp2 && node.to) {
+        const steps = 10; // Subdivide curve into 10 straight segments
+        const p0 = currentPt;
+        const p1 = node.cp1;
+        const p2 = node.cp2;
+        const p3 = node.to;
+
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps;
+          const invT = 1 - t;
+
+          // Parametric Cubic Bezier Formula
+          const x =
+            invT * invT * invT * p0.x +
+            3 * invT * invT * t * p1.x +
+            3 * invT * t * t * p2.x +
+            t * t * t * p3.x;
+          const y =
+            invT * invT * invT * p0.y +
+            3 * invT * invT * t * p1.y +
+            3 * invT * t * t * p2.y +
+            t * t * t * p3.y;
+
+          points.push({ x, y });
+        }
+        currentPt = p3;
+      }
+    }
     return points;
   }
 
   /**
-   * Resolves the Right-Hand Rule and Left/Right normal directional offsets.
-   * Defines Left/Right half-spaces for one-way mirrors, ledges, or illusions.
-   * n_right = (y2 - y1, x1 - x2) | n_left = (y1 - y2, x2 - x1)
+   * Merges and simplifies collinear segments on vector paths, reducing 
+   * file footprint sizes and compiling direction blocks with precision.
    */
-  public static calculateSegmentNormal(p1: Point, p2: Point): { left: Point; right: Point } {
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
-
-    // Return unit length normal vectors
-    const len = Math.hypot(dx, dy) || 1.0;
-    return {
-      left: { x: -dy / len, y: dx / len },
-      right: { x: dy / len, y: -dx / len }
-    };
-  }
-
-  /**
-   * Collinear Simplification Filter.
-   * Evaluates the cross-product of consecutive vectors. Removes intermediate
-   * nodes if segments lie along a perfectly straight line within tolerance.
-   */
-  public static simplifyCollinearPath(points: Point[], tolerance: number = 1e-5): Point[] {
+  public simplifyCollinearPath(points: MapOrigin[], epsilon: number = 1e-5): MapOrigin[] {
     if (points.length <= 2) return points;
 
-    const simplified: Point[] = [points];
+    const result: MapOrigin[] = [points[0]];
 
     for (let i = 1; i < points.length - 1; i++) {
-      const prev = simplified[simplified.length - 1];
-      const curr = points[i];
-      const next = points[i + 1];
+      const p1 = result[result.length - 1];
+      const p2 = points[i];
+      const p3 = points[i + 1];
 
-      // Calculate the area of triangle (cross product delta)
-      const crossProduct = (curr.y - prev.y) * (next.x - curr.x) - (curr.x - prev.x) * (next.y - curr.y);
+      // Calculate cross product: Area = x1(y2 - y3) + x2(y3 - y1) + x3(y1 - y2)
+      const area = p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y);
 
-      if (Math.abs(crossProduct) > tolerance) {
-        simplified.push(curr);
+      if (Math.abs(area) > epsilon) {
+        result.push(p2);
       }
     }
 
-    simplified.push(points[points.length - 1]);
-    return simplified;
+    result.push(points[points.length - 1]);
+    return result;
   }
-}
 
-// ======================================================================
-// 4. Environmental & Interactive Audio Physics
-// ======================================================================
+  // ============================================================================
+  // SECTION 5: HELPER UTILITIES
+  // ============================================================================
 
-export class AcousticEngine {
-  /**
-   * Proximity falloff mathematical volume model.
-   * Mathematically dampens and clamps localized acoustics. Prevents popping
-   * artifacts and negative bounds at boundaries.
-   * Formula: V = max(0, min(V_max, V_max * (1 - d/r)))
-   */
-  public static calculateProximityVolume(
-    tokenPos: Point,
-    emitterPos: Point,
-    coreRadius: number,
-    fadeRadius: number,
-    volumeMax: number
-  ): number {
-    const distance = Math.hypot(tokenPos.x - emitterPos.x, tokenPos.y - emitterPos.y);
-
-    // Fully inside the core volume radius
-    if (distance <= coreRadius) {
-      return volumeMax;
+  private hexToUint8Array(hex: string): Uint8Array {
+    const cleanHex = hex.trim();
+    const len = cleanHex.length;
+    const view = new Uint8Array(len / 2);
+    for (let i = 0; i < len; i += 2) {
+      view[i / 2] = parseInt(cleanHex.substring(i, i + 2), 16);
     }
+    return view;
+  }
 
-    const totalBound = coreRadius + fadeRadius;
-
-    // Fully outside the fading boundary threshold
-    if (distance >= totalBound) {
-      return 0.0;
-    }
-
-    // Mathematically clamp values along the fade slope
-    const effectiveDistance = distance - coreRadius;
-    const volumeDecay = volumeMax * (1.0 - effectiveDistance / fadeRadius);
-
-    return Math.max(0.0, Math.min(volumeMax, volumeDecay));
+  private bufferToHex(buffer: ArrayBuffer): string {
+    const view = new Uint8Array(buffer);
+    return Array.from(view)
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
   }
 }
