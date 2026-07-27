@@ -2,38 +2,31 @@
 # Configuration for actions/labeler to automatically label Pull Requests based on modified files.
 # Compatible with actions/labeler@v5 (https://github.com/actions/labeler)
 
-'spec:schemas':
-  - any-glob-to-any-file: 'schemas/**/*.json'
+"spec: schemas":
+  - any-glob-to-any-file: "schemas/**/*.json"
 
-'spec:manifest':
-  - any-glob-to-any-file: 'schemas/manifest.schema.json'
+"spec: manifest":
+  - any-glob-to-any-file: "schemas/manifest.schema.json"
 
-'spec:geometry':
-  - any-glob-to-any-file: 'schemas/geometry.schema.json'
+"spec: geometry":
+  - any-glob-to-any-file: "schemas/geometry.schema.json"
 
-'spec:entities':
-  - any-glob-to-any-file: 'schemas/entities.schema.json'
+"spec: entities":
+  - any-glob-to-any-file: "schemas/entities.schema.json"
 
-'parser:go':
-  - any-glob-to-any-file: 'reference-parsers/go/**/*'
+"parser: go":
+  - any-glob-to-any-file: "reference-parsers/go/**/*"
 
-'parser:typescript':
-  - any-glob-to-any-file: 'reference-parsers/typescript/**/*'
+"parser: typescript":
+  - any-glob-to-any-file: "reference-parsers/typescript/**/*"
 
-'project:upgrader':
+"project: ci-cd":
+  - any-glob-to-any-file: ".github/**/*"
+
+"project: docs":
   - any-glob-to-any-file:
-      - 'src/**/*'
-      - 'public/**/*'
-      - 'package.json'
-      - 'vite.config.js'
-
-'project:ci-cd':
-  - any-glob-to-any-file: '.github/**/*'
-
-'project:docs':
-  - any-glob-to-any-file:
-      - 'README.md'
-      - 'CONTRIBUTING.md'
-      - 'UVTT_v2_SPEC.md'
-      - 'docs/**/*'
-      - 'RFCs/**/*'
+      - "README.md"
+      - "CONTRIBUTING.md"
+      - "UNIVERSAL_VTT_V2_SPEC.md"
+      - "docs/**/*"
+      - "RFCs/**/*"

@@ -1,3 +1,4 @@
+# .github/labels.yml
 - name: "rfc: proposal"
   color: "5319e7"
   description: "Request for Comments: Proposed additions or changes to the UVTT v2 schema."
@@ -5,6 +6,10 @@
 - name: "bug: compliance"
   color: "d93f0b"
   description: "Conformance validation mismatches, parser crashes, or schema bugs."
+
+- name: "spec: schemas"
+  color: "1d76db"
+  description: "General modifications to any JSON schema file."
 
 - name: "spec: manifest"
   color: "1d76db"
@@ -17,6 +22,22 @@
 - name: "spec: entities"
   color: "fbca04"
   description: "Related to entities.json (lights, events, audio, emitters, spawns)."
+
+- name: "parser: go"
+  color: "00ADD8"
+  description: "Modifications to the Go reference implementation."
+
+- name: "parser: typescript"
+  color: "3178C6"
+  description: "Modifications to the TypeScript reference implementation."
+
+- name: "project: ci-cd"
+  color: "24292f"
+  description: "Updates to GitHub Actions, automated tests, or labelers."
+
+- name: "project: docs"
+  color: "0075ca"
+  description: "Updates to README, standard specification, or RFC documentation."
 
 - name: "status: draft"
   color: "bfd4f2"
