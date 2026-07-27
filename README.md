@@ -1,4 +1,5 @@
 # Universal VTT v2 (UVTT v2) Specification
+
 **The open-source, high-performance standard for interconnected TTRPG campaign mapping.**
 
 The UVTT v2 specification provides a modern, robust, and extensible framework for TTRPG map data. Designed to replace the legacy 2D-only flat formats (.dd2vtt / .df2vtt), UVTT v2 enables verticality, complex spatial triggers, hardware-accelerated rendering, and multi-file campaign networking.
@@ -6,24 +7,28 @@ The UVTT v2 specification provides a modern, robust, and extensible framework fo
 ---
 
 ### 🚀 Why UVTT v2?
+
 Legacy V1 standards were ground-breaking, but they suffer from significant architectural bottlenecks. UVTT v2 solves these by treating maps not as static images, but as nodes within a **Topological Spatial Network**.
 
 #### The Problem with v1
-*   **Data Bloat:** Base64-encoded images embedded in JSON inflate payloads by ~33.3%, causing UI freezes and OOM errors in browser-based VTTs.
-*   **The "Flat Earth" Assumption:** Legacy formats assume all maps are 2D planes, rendering vertical gameplay (multi-level dungeons) a nightmare to manage.
-*   **Mathematical Inefficiency:** Jagged straight-line approximation for curved walls wastes GPU resources and creates visual air leaks.
-*   **Fragmented Campaigns:** Maps are isolated islands. Linking a portal in Map A to Map B required manual GM intervention.
+
+- **Data Bloat:** Base64-encoded images embedded in JSON inflate payloads by ~33.3%, causing UI freezes and OOM errors in browser-based VTTs.
+- **The "Flat Earth" Assumption:** Legacy formats assume all maps are 2D planes, rendering vertical gameplay (multi-level dungeons) a nightmare to manage.
+- **Mathematical Inefficiency:** Jagged straight-line approximation for curved walls wastes GPU resources and creates visual air leaks.
+- **Fragmented Campaigns:** Maps are isolated islands. Linking a portal in Map A to Map B required manual GM intervention.
 
 #### The Solution: v2 Architecture
-*   **Binary Archive Container (.uvtt2z):** A zipped directory that detaches heavy image assets from metadata. This enables streamability, lazy loading, and sub-second directory browsing.
-*   **Material-Aware Geometry:** Directional Line-of-Sight (using the Right-Hand Rule) and explicit height-blocking properties for walls, terrain, and foliage.
-*   **Spatial Routing:** A native URI-based system (internal:// and relative://) allows for seamless, zero-lag transitions between maps and floors in mega-dungeons.
-*   **Future-Proof Extensibility:** A hardware_profile block ensures the format can scale from WebGL2 to WebGPU without requiring a schema rewrite.
-*   **PixiJS v8 Ready**: Full architectural integration with PixiJS v8's async initialization, decoupled styling, and WebGPU hardware execution targets.
+
+- **Binary Archive Container (.uvtt2z):** A zipped directory that detaches heavy image assets from metadata. This enables streamability, lazy loading, and sub-second directory browsing.
+- **Material-Aware Geometry:** Directional Line-of-Sight (using the Right-Hand Rule) and explicit height-blocking properties for walls, terrain, and foliage.
+- **Spatial Routing:** A native URI-based system (internal:// and relative://) allows for seamless, zero-lag transitions between maps and floors in mega-dungeons.
+- **Future-Proof Extensibility:** A hardware_profile block ensures the format can scale from WebGL2 to WebGPU without requiring a schema rewrite.
+- **PixiJS v8 Ready**: Full architectural integration with PixiJS v8's async initialization, decoupled styling, and WebGPU hardware execution targets.
 
 ---
 
 ### 📂 Repository Structure
+
 ```yaml
 uvtt-v2-workspace/               # Open the parent folder directly in VS Code
 ├── .github/                     # Automated repository workflows and templates
@@ -65,34 +70,41 @@ uvtt-v2-workspace/               # Open the parent folder directly in VS Code
 ---
 
 ### 🛠️ Feature Matrix
-| Feature | Legacy v1 | UVTT v2 |
-| ------ | ------ | ------ |
-| **Asset Delivery** | Base64-in-JSON | Zipped Directory (.uvtt2z) |
-| **Grid Logic** | Square Only | Square, Hex, Isometric |
-| **Verticality** | Flat Plane | 3D Bounds (Bottom/Top Z) |
-| **Curves** | Jagged Line Segments | Native SVG Bézier Paths |
-| **Visibility** | Symmetrical | Directional (Right-Hand Rule) |
-| **Interoperability** | Disconnected Islands | Topological Spatial Network |
-| **Weather** | None | Bounded Particle Emitters |
-| **Graphics Baseline**| WebGL 1.0 / Canvas | WebGL 2.0 / WebGPU (PixiJS v8 Native) |
+
+| Feature               | Legacy v1            | UVTT v2                               |
+| --------------------- | -------------------- | ------------------------------------- |
+| **Asset Delivery**    | Base64-in-JSON       | Zipped Directory (.uvtt2z)            |
+| **Grid Logic**        | Square Only          | Square, Hex, Isometric                |
+| **Verticality**       | Flat Plane           | 3D Bounds (Bottom/Top Z)              |
+| **Curves**            | Jagged Line Segments | Native SVG Bézier Paths               |
+| **Visibility**        | Symmetrical          | Directional (Right-Hand Rule)         |
+| **Interoperability**  | Disconnected Islands | Topological Spatial Network           |
+| **Weather**           | None                 | Bounded Particle Emitters             |
+| **Graphics Baseline** | WebGL 1.0 / Canvas   | WebGL 2.0 / WebGPU (PixiJS v8 Native) |
 
 ---
 
 ### 📝 Governance & Contribution
+
 The UVTT v2 specification is a **Living Document**. We welcome contributions from VTT engine developers and map-making tool authors.
 
 #### The RFC Pipeline
+
 To propose a new feature (e.g., new atmospheric shaders, advanced lighting physics), please follow these steps:
+
 1. **Draft an RFC:** Create a markdown proposal in the /RFCs directory using the provided template.
 2. **Pull Request:** Submit your RFC via a Pull Request.
 3. **Community Review:** We evaluate based on backward compatibility, performance impact, and interoperability.
 
 #### The Backward-Compatibility Contract
+
 Core features—including basic walls, portals, and landing zones—are immutable. Any new functionality (e.g., advanced WebGPU compute shaders) must be implemented as additive, optional properties within the extensions block to ensure that existing engines remain compliant.
 
 ---
 
 ### 🔗 Getting Started
-*   **[View the Full Specification](schemas/)**
-*   **[Launch the Reference Upgrader Web App](https://thegeolama.github.io/uvtt-v2-upgrader/)** (A zero-install Single Page Application to migrate and graphically upgrade legacy maps to v2 natively in your browser).
-*   **[Join the Discussion](https://github.com/TheGeolama/uvtt-v2-specification/issues)**
+
+- **[View the Full Specification](schemas/)**
+- **[Launch the Reference Upgrader Web App](https://upgrader.universalvtt.org)** (A zero-install Single Page Application to migrate and graphically upgrade legacy maps to v2 natively in your browser).
+- **[View the Source Code on GitHub](https://repo.universalvtt.org)**
+- **[Join the Discussion](https://discuss.universalvtt.org)**
