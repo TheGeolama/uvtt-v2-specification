@@ -40,7 +40,7 @@ A standard `.uvtt2z` archive must contain the following flat directory structure
     ├── entities.json       # Lights, audio, spawns, and events (Points)
     └── assets/             # Directory containing all referenced .webp, .mp3, etc.
 
-An example could like this:
+An example could look like this:
 
     feodors_campout.uvtt2z/
     ├── manifest.json       # Metadata, grid sizing, and background definitions
