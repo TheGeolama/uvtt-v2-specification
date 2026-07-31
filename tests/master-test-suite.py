@@ -10,8 +10,7 @@ Features:
 1. Complete Campaign ZIP Conformance Check & manifest.hash integrity parsing.
 2. Strict geometric checks (height Z-bounds, Right-Hand Rule normals, SVG paths).
 3. Sound-clamping, landing-zone exclusivity, and prediction trigger constraints.
-4. Built-in JWKS & ZKS Edge Clearinghouse Mock Server daemon.
-5. Cryptographic signature, entitlement scope, expiration, and revocation checks.
+4. Direct AES-256-GCM envelope decryption using standard raw keys.
 ======================================================================
 """
 
@@ -20,32 +19,16 @@ import sys
 import json
 import math
 import hashlib
-import hmac
 import zipfile
 import argparse
-import threading
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from io import BytesIO
 
-# Set up optional cryptography & JWT imports for the ZKS tests
+# Set up optional cryptography import for AES-GCM tests
 try:
-    import jwt
-    from cryptography.hazmat.primitives.asymmetric import rsa
-    from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     HAS_CRYPTO = True
 except ImportError:
     HAS_CRYPTO = False
-
-from io import BytesIO
-
-def derive_key(secret: str, sku: str, salt: str) -> bytes:
-    import hmac
-    import hashlib
-    msg = (sku + salt).encode("utf-8")
-    h = hmac.new(secret.encode("utf-8"), msg, hashlib.sha256)
-    return h.digest()
 
 # ANSI Color Codes
 COLOR_RESET = "\033[0m"
@@ -54,7 +37,6 @@ COLOR_RED = "\033[31m"
 COLOR_GREEN = "\033[32m"
 COLOR_YELLOW = "\033[33m"
 COLOR_BLUE = "\033[34m"
-COLOR_CYAN = "\033[36m"
 
 def log_info(msg, quiet=False):
     if not quiet:
@@ -75,15 +57,13 @@ def log_error(msg):
 # =====================================================================
 
 class UVTT2ConformanceChecker:
-    def __init__(self, archive_path, quiet=False, secret=None, sku=None, salt=None):
+    def __init__(self, archive_path, quiet=False, key_hex=None):
         self.archive_path = archive_path
         self.quiet = quiet
         self.temp_dir = None
         self.files_map = {}
         self.manifest_data = None
-        self.secret = secret or "RETAILER_MASTER_CRITICAL_SECRET_2026_07_11"
-        self.sku = sku or "SKU-DUNGEON-001"
-        self.salt = salt or "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" 
+        self.key_hex = key_hex
 
     def run_all(self):
         log_info(f"Initiating full validation sequence for: {self.archive_path}", self.quiet)
@@ -91,29 +71,40 @@ class UVTT2ConformanceChecker:
             log_error(f"Target archive not found: {self.archive_path}")
             return False
 
-        is_encrypted = self.archive_path.endswith(".uvtt2k")
+        is_encrypted = self.archive_path.endswith((".uvtt2k", ".enc"))
         if not is_encrypted and not zipfile.is_zipfile(self.archive_path):
-            log_error("Target file is not a valid ZIP container archive (.uvtt2z / .gvtt).")
+            log_error("Target file is not a valid ZIP container archive (.uvtt2z).")
             return False
 
         try:
             if is_encrypted:
-                log_info("[*] Decrypted .uvtt2k GCM envelope requested. Initializing decryption handshake...", self.quiet)
+                log_info("[*] Decrypted envelope requested. Initializing decryption...", self.quiet)
                 if not HAS_CRYPTO:
-                    log_error("cryptography package is required to decrypt .uvtt2k containers.")
+                    log_error("cryptography package is required to decrypt encrypted containers.")
                     return False
+                if not self.key_hex or len(self.key_hex) != 64:
+                    log_error("A valid 64-character hexadecimal key must be provided to decrypt the container.")
+                    return False
+
                 with open(self.archive_path, "rb") as f:
                     enc_bytes = f.read()
                 if len(enc_bytes) < 12:
                     log_error("Encrypted payload too short (missing 12-byte IV).")
                     return False
+
                 nonce = enc_bytes[:12]
                 ciphertext = enc_bytes[12:]
-                key = derive_key(self.secret, self.sku, self.salt)
+                key = bytes.fromhex(self.key_hex)
                 aesgcm = AESGCM(key)
-                decrypted_zip = aesgcm.decrypt(nonce, ciphertext, None)
+                
+                try:
+                    decrypted_zip = aesgcm.decrypt(nonce, ciphertext, None)
+                except Exception as e:
+                    log_error(f"Decryption failed (Invalid key or corrupted payload): {e}")
+                    return False
+
                 zf_input = BytesIO(decrypted_zip)
-                log_success("Decryption handshake successful! Decrypted .uvtt2k in-memory stream safely.", self.quiet)
+                log_success("Decryption successful! Decrypted container safely in-memory.", self.quiet)
             else:
                 zf_input = self.archive_path
 
@@ -191,7 +182,6 @@ class UVTT2ConformanceChecker:
 
         for name, content in self.files_map.items():
             if name in ["manifest.hash", "manifest.json"]:
-                # The manifest.hash and manifest.json (in some modes) are excluded from active verification loop to avoid circular locks
                 continue
             if name not in hash_registry:
                 log_error(f"Security Alert: Untracked file found in container: {name}")
@@ -217,7 +207,6 @@ class UVTT2ConformanceChecker:
             map_path = f"{path}map.webp"
             base_path = f"{path}basemap.webp"
 
-        # Validate localized manifest
         if manifest_path not in self.files_map:
             log_error(f"Missing mandatory localized map manifest: {manifest_path}")
             return False
@@ -230,17 +219,14 @@ class UVTT2ConformanceChecker:
             log_error(f"Syntax error inside sub-map manifest {manifest_path}: {e}")
             return False
 
-        # Validate basemap
         if base_path not in self.files_map:
             log_error(f"Missing baseline raster texture asset: {base_path}")
             return False
 
-        # Validate map high-res
         if map_path not in self.files_map:
             log_error(f"Missing full-fidelity map asset: {map_path}")
             return False
 
-        # Validate geometry
         if geom_path not in self.files_map:
             log_error(f"Missing mandatory architectural layout geometry: {geom_path}")
             return False
@@ -252,7 +238,6 @@ class UVTT2ConformanceChecker:
             log_error(f"Syntax error inside {geom_path}: {e}")
             return False
 
-        # Validate entities if present
         if ent_path in self.files_map:
             try:
                 ent_data = json.loads(self.files_map[ent_path].decode("utf-8"))
@@ -267,7 +252,6 @@ class UVTT2ConformanceChecker:
         return True
 
     def validate_geometry_schema(self, geom):
-        # Resolve variables
         resolution = geom.get("resolution", {})
         grid_size = resolution.get("grid_size", {})
         topology = resolution.get("topology", {})
@@ -281,7 +265,6 @@ class UVTT2ConformanceChecker:
             log_error(f"Unsupported grid projection layout: '{grid_type}'")
             return False
 
-        # Check Hex details
         if grid_type == "hex":
             orientation = topology.get("orientation")
             offset = topology.get("offset")
@@ -289,30 +272,25 @@ class UVTT2ConformanceChecker:
                 log_error(f"Malformed hexagonal offset layout configuration (orientation: {orientation}, offset: {offset})")
                 return False
 
-        # Check Isometric details
         if grid_type == "isometric":
             ratio = topology.get("isometric_ratio", 0.5)
             if not (0.0 < ratio <= 1.0):
                 log_error(f"Invalid isometric skew calibration index: {ratio}. Must sit within (0.0, 1.0].")
                 return False
 
-        # Validate vector paths
         geometry = geom.get("geometry", {})
         walls = geometry.get("walls", [])
         for wall in walls:
             wall_id = wall.get("id", "unnamed")
-            wall_type = wall.get("type", "standard")
             height = wall.get("height", {})
             path = wall.get("path", [])
 
-            # Check Z-height orientation
             bottom = height.get("bottom", 0.0)
             top = height.get("top", 0.0)
             if bottom > top:
                 log_error(f"Verticality conflict on wall '{wall_id}': Bottom height ({bottom}) exceeds Top boundary ({top}).")
                 return False
 
-            # Check SVG Vector paths
             if not path:
                 log_error(f"Wall segment '{wall_id}' defines an empty vector path mapping.")
                 return False
@@ -326,7 +304,6 @@ class UVTT2ConformanceChecker:
                     log_error(f"Pathing rule violation on wall '{wall_id}': Base vector node must use 'move' command.")
                     return False
 
-            # Check Right-Hand Rule indicators
             dir_blocks = wall.get("directional_blocks")
             if dir_blocks:
                 if "left_to_right" not in dir_blocks or "right_to_left" not in dir_blocks:
@@ -336,7 +313,6 @@ class UVTT2ConformanceChecker:
         return True
 
     def validate_entities_schema(self, ent):
-        # Validate Landing Zones (Spawns)
         landing_zones = ent.get("landing_zones", [])
         default_count = 0
         for lz in landing_zones:
@@ -352,7 +328,6 @@ class UVTT2ConformanceChecker:
             log_error(f"Topology Error: Map entities file defines multiple ({default_count}) default landing zones. Enforcing Single-Default limit.")
             return False
 
-        # Validate Portals & Events
         events = ent.get("events", [])
         for ev in events:
             ev_id = ev.get("id", "unnamed")
@@ -362,7 +337,6 @@ class UVTT2ConformanceChecker:
                 log_error(f"Dynamic pre-slicing window threshold index on '{ev_id}' must be a positive float value: {rad_pred}")
                 return False
 
-        # Validate Acoustic Sound Zones
         audio = ent.get("audio", {})
         zones = audio.get("zones", [])
         for zone in zones:
@@ -381,340 +355,16 @@ class UVTT2ConformanceChecker:
         return True
 
 # =====================================================================
-# SECTION 2: CRYPTOGRAPHIC ZKS VERIFICATION & DAEMON
-# =====================================================================
-
-class MockZKSWorkerHandler(BaseHTTPRequestHandler):
-    """
-    Simulates a live serverless edge worker (Cloudflare Worker) performing JWT verification,
-    JWKS public key hosting, and dynamic HMAC-SHA256 key derivations.
-    """
-    retailer_master_secret = b"RETAILER_MASTER_CRITICAL_SECRET_2026_07_11"
-    revocations_db = {
-        # SHA-256 hash of 'TX-REFUNDED-999'
-        "revocation:7146af0ad6796308efa99275fa5ac9df9d757494ea6618c9ca84629d56be9cc1": {
-            "revoked_at": "2026-07-11T12:00:00Z",
-            "reason": "Customer Refund Processing"
-        }
-    }
-    rsa_key_pair = None
-    jwks_json = "{}"
-
-    @classmethod
-    def generate_signing_keys(cls):
-        if not HAS_CRYPTO:
-            return
-        # Generate raw 2048-bit RSA keys
-        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        cls.rsa_key_pair = private_key
-        
-        # Format keys to conform to JWKS requirements
-        public_key = private_key.public_key()
-        numbers = public_key.public_numbers()
-        
-        # Base64url helper encoding standard
-        def b64url(val):
-            import base64
-            # Convert integer to bytes then encode
-            byte_len = (val.bit_length() + 7) // 8
-            b = val.to_bytes(byte_len, byteorder='big')
-            return base64.urlsafe_b64encode(b).decode('utf-8').rstrip('=')
-
-        cls.jwks_json = json.dumps({
-            "keys": [{
-                "kty": "RSA",
-                "alg": "RS256",
-                "use": "sig",
-                "kid": "mock-signing-key-01",
-                "n": b64url(numbers.n),
-                "e": b64url(numbers.e)
-            }]
-        }, indent=2)
-
-    def log_message(self, format, *args):
-        # Prevent spamming console logs during parallel daemon runs
-        pass
-
-    def do_GET(self):
-        if self.path == "/.well-known/jwks.json":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(self.jwks_json.encode("utf-8"))
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-    def do_POST(self):
-        if self.path == "/v1/drm/handshake":
-            self.handle_handshake()
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-    def handle_handshake(self):
-        # 1. Parse body
-        content_length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(content_length)
-        try:
-            payload = json.loads(body.decode("utf-8"))
-        except Exception:
-            self.send_response(400)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            res = {"status": "error", "error_code": "MALFORMED_PAYLOAD", "message": "Payload body is not valid JSON."}
-            self.wfile.write(json.dumps(res).encode("utf-8"))
-            return
-
-        product_sku = payload.get("product_sku")
-        key_salt_checksum = payload.get("key_salt_checksum")
-
-        # 2. Check SKU and salt parameter
-        if not product_sku:
-            self.send_error_response(400, "MISSING_SKU", "The product_sku parameter is required.")
-            return
-
-        if not key_salt_checksum or len(key_salt_checksum) != 32:
-            self.send_error_response(400, "MALFORMED_SALT", "The key_salt_checksum parameter must be a 32-character hexadecimal string.")
-            return
-
-        # 3. Check Auth header
-        auth_header = self.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
-            self.send_error_response(401, "TOKEN_MISSING", "Bearer authorization token required.")
-            return
-
-        token = auth_header.split(" ")[1]
-
-        # 4. Parse token claims and verify signature
-        if not HAS_CRYPTO:
-            self.send_error_response(500, "LIBS_MISSING", "Cryptographic modules missing on host.")
-            return
-
-        try:
-            public_key = self.rsa_key_pair.public_key()
-            decoded_claims = jwt.decode(token, public_key, algorithms=["RS256"], options={"verify_aud": False})
-        except jwt.ExpiredSignatureError:
-            self.send_error_response(401, "TOKEN_EXPIRED", "The provided authorization token has expired.")
-            return
-        except jwt.InvalidTokenError as e:
-            self.send_error_response(401, "TOKEN_INVALID", f"Signature validation failed: {e}")
-            return
-
-        # 5. Assert entitlements
-        user_entitlements = decoded_claims.get("entitlements", [])
-        if product_sku not in user_entitlements:
-            self.send_error_response(403, "INSUFFICIENT_ENTITLEMENTS", f"The provided license token does not authorize access to the requested {product_sku}.")
-            return
-
-        # 6. Check revocation database
-        transaction_id = decoded_claims.get("tx_id", "untracked")
-        hashed_tx = hashlib.sha256(transaction_id.encode("utf-8")).hexdigest()
-        revocation_key = f"revocation:{hashed_tx}"
-
-        if revocation_key in self.revocations_db:
-            self.send_error_response(403, "TRANSACTION_REVOKED", "This license receipt has been revoked due to refund processing or security flag.")
-            return
-
-        # 7. HMAC-SHA256 derivation
-        derivation_input = f"{product_sku}{key_salt_checksum}".encode("utf-8")
-        derived_key = hmac.new(self.retailer_master_secret, derivation_input, hashlib.sha256).hexdigest()
-
-        # Success response
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        res = {
-            "status": "success",
-            "decryption_key_hex": derived_key,
-            "algorithm": "AES-GCM",
-            "key_length_bits": 256
-        }
-        self.wfile.write(json.dumps(res).encode("utf-8"))
-
-    def send_error_response(self, status, error_code, msg):
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        res = {
-            "status": "error",
-            "error_code": error_code,
-            "message": msg
-        }
-        self.wfile.write(json.dumps(res).encode("utf-8"))
-
-
-class CryptographicHandshakeSuite:
-    """
-    Fires the five required integration test scenarios against either the
-    built-in local daemon thread or a live remote Worker endpoint.
-    """
-    def __init__(self, target_url, master_secret_bytes=None):
-        self.target_url = target_url
-        self.master_secret_bytes = master_secret_bytes or b"RETAILER_MASTER_CRITICAL_SECRET_2026_07_11"
-        self.valid_token = None
-        self.expired_token = None
-        self.wrong_sku_token = None
-        self.revoked_token = None
-
-    def forge_test_tokens(self, rsa_private_key):
-        if not HAS_CRYPTO:
-            return
-        import time
-        now = int(time.time())
-
-        # 1. Valid Token
-        self.valid_token = jwt.encode({
-            "sub": "user_happy_path",
-            "entitlements": ["SKU-DUNGEON-001"],
-            "tx_id": "TX-SUCCESSFUL-111",
-            "iat": now - 10,
-            "exp": now + 3600
-        }, rsa_private_key, algorithm="RS256", headers={"kid": "mock-signing-key-01"})
-
-        # 2. Expired Token
-        self.expired_token = jwt.encode({
-            "sub": "user_expired",
-            "entitlements": ["SKU-DUNGEON-001"],
-            "tx_id": "TX-EXPIRED-222",
-            "iat": now - 3600,
-            "exp": now - 10
-        }, rsa_private_key, algorithm="RS256", headers={"kid": "mock-signing-key-01"})
-
-        # 3. Wrong SKU Token
-        self.wrong_sku_token = jwt.encode({
-            "sub": "user_wrong_scope",
-            "entitlements": ["SKU-DUNGEON-002"],
-            "tx_id": "TX-WRONG-SKU-333",
-            "iat": now - 10,
-            "exp": now + 3600
-        }, rsa_private_key, algorithm="RS256", headers={"kid": "mock-signing-key-01"})
-
-        # 4. Revoked Token
-        self.revoked_token = jwt.encode({
-            "sub": "user_revoked",
-            "entitlements": ["SKU-DUNGEON-001"],
-            "tx_id": "TX-REFUNDED-999",
-            "iat": now - 10,
-            "exp": now + 3600
-        }, rsa_private_key, algorithm="RS256", headers={"kid": "mock-signing-key-01"})
-
-    def fire_request(self, token, payload, expected_status):
-        req = Request(self.target_url, method="POST")
-        req.add_header("Authorization", f"Bearer {token}")
-        req.add_header("Content-Type", "application/json")
-        data_bytes = json.dumps(payload).encode("utf-8")
-        
-        try:
-            with urlopen(req, data=data_bytes) as res:
-                body = res.read().decode("utf-8")
-                return res.status, json.loads(body)
-        except HTTPError as e:
-            body = e.read().decode("utf-8")
-            try:
-                return e.code, json.loads(body)
-            except Exception:
-                return e.code, {"message": body}
-        except Exception as e:
-            return 0, {"message": str(e)}
-
-    def run_handshake_tests(self):
-        if not HAS_CRYPTO:
-            log_warn("Symmetric testing components are bypassed because 'cryptography' or 'PyJWT' are missing.")
-            return False
-
-        print(f"\n{COLOR_BOLD}{COLOR_BLUE}======================================================================{COLOR_RESET}")
-        print(f"{COLOR_BOLD}         ZKS Clearinghouse Token Authorization Integration Suite       {COLOR_RESET}")
-        print(f"{COLOR_BOLD}{COLOR_BLUE}======================================================================{COLOR_RESET}")
-        print(f"Target Endpoint : {self.target_url}")
-        print(f"Master Secret   : {self.master_secret_bytes.decode('utf-8')[:4]}...*************************************************")
-        print(f"{COLOR_BLUE}----------------------------------------------------------------------{COLOR_RESET}")
-
-        all_passed = True
-
-        # Test Case 1: Standard Authorized Handshake (Happy Path)
-        payload_tc1 = {"product_sku": "SKU-DUNGEON-001", "key_salt_checksum": "a8f3b2d1c0e9f8a7b6c5d4e3f2a1b0c9"}
-        status, res = self.fire_request(self.valid_token, payload_tc1, 200)
-        
-        # Calculate local key derivation to verify worker's mathematical determinism
-        der_input = f"{payload_tc1['product_sku']}{payload_tc1['key_salt_checksum']}".encode("utf-8")
-        local_key = hmac.new(self.master_secret_bytes, der_input, hashlib.sha256).hexdigest()
-
-        if status == 200 and res.get("decryption_key_hex") == local_key:
-            print(f"[*] Running Test Case 1: Valid JWT with authorized SKU...")
-            print(f"  {COLOR_GREEN}[PASS] Handshake successful. Derived Key: {res.get('decryption_key_hex')}{COLOR_RESET}")
-        else:
-            print(f"[*] Running Test Case 1: Valid JWT with authorized SKU...")
-            print(f"  {COLOR_RED}[FAIL] Server derived key mismatch or bad HTTP code: {status} {res}{COLOR_RESET}")
-            all_passed = False
-
-        # Test Case 2: Block Expired Authorization Tokens (Security Gate)
-        status, res = self.fire_request(self.expired_token, payload_tc1, 401)
-        if status == 401 and res.get("error_code") == "TOKEN_EXPIRED":
-            print(f"[*] Running Test Case 2: Block Expired Authorization Tokens...")
-            print(f"  {COLOR_GREEN}[PASS] Endpoint correctly blocked expired token. Reason: {res.get('message')}{COLOR_RESET}")
-        else:
-            print(f"[*] Running Test Case 2: Block Expired Authorization Tokens...")
-            print(f"  {COLOR_RED}[FAIL] Expired token was not correctly intercepted: {status} {res}{COLOR_RESET}")
-            all_passed = False
-
-        # Test Case 3: Entitlement Verification Mismatch (Scope Gate)
-        status, res = self.fire_request(self.wrong_sku_token, payload_tc1, 403)
-        if status == 403 and res.get("error_code") == "INSUFFICIENT_ENTITLEMENTS":
-            print(f"[*] Running Test Case 3: Entitlement Verification Mismatch...")
-            print(f"  {COLOR_GREEN}[PASS] Endpoint blocked unauthorized SKU request. Code: {res.get('error_code')}{COLOR_RESET}")
-        else:
-            print(f"[*] Running Test Case 3: Entitlement Verification Mismatch...")
-            print(f"  {COLOR_RED}[FAIL] Unauthorized product request was bypassed: {status} {res}{COLOR_RESET}")
-            all_passed = False
-
-        # Test Case 4: Revocation Matching (Active Fallback Gate)
-        status, res = self.fire_request(self.revoked_token, payload_tc1, 403)
-        if status == 403 and res.get("error_code") == "TRANSACTION_REVOKED":
-            print(f"[*] Running Test Case 4: Revocation Matching (Active Fallback Gate)...")
-            print(f"  {COLOR_GREEN}[PASS] Blocked refunded transaction. Access denied: {res.get('message')}{COLOR_RESET}")
-        else:
-            print(f"[*] Running Test Case 4: Revocation Matching (Active Fallback Gate)...")
-            print(f"  {COLOR_RED}[FAIL] Revoked transaction bypassed database filters: {status} {res}{COLOR_RESET}")
-            all_passed = False
-
-        # Test Case 5: Mathematical Integrity and Nonce Assertion
-        payload_tc5 = {"product_sku": "SKU-DUNGEON-001", "key_salt_checksum": "INVALID_CHARS!!!"}
-        status, res = self.fire_request(self.valid_token, payload_tc5, 400)
-        if status == 400 and res.get("error_code") == "MALFORMED_SALT":
-            print(f"[*] Running Test Case 5: Mathematical Integrity Assertions...")
-            print(f"  {COLOR_GREEN}[PASS] Blocked malformed salt parameter. Reason: {res.get('message')}{COLOR_RESET}")
-        else:
-            print(f"[*] Running Test Case 5: Mathematical Integrity Assertions...")
-            print(f"  {COLOR_RED}[FAIL] Malformed salt request reached key derivations: {status} {res}{COLOR_RESET}")
-            all_passed = False
-
-        print(f"{COLOR_BLUE}======================================================================{COLOR_RESET}")
-        if all_passed:
-            print(f"   {COLOR_BOLD}{COLOR_GREEN}CONFORMANCE INTEGRATION RESULTS: ALL TEST CASES PASSED (5 / 5)   {COLOR_RESET}")
-            print(f"   Edge token signature & SKU mapping match specification contracts.")
-        else:
-            print(f"   {COLOR_BOLD}{COLOR_RED}CONFORMANCE INTEGRATION FAILURE: CHECK GATE ERRORS{COLOR_RESET}")
-        print(f"{COLOR_BLUE}======================================================================{COLOR_RESET}\n")
-
-        return all_passed
-
-# =====================================================================
-# SECTION 3: SYSTEM SELF-TEST AND MOCK CAMPAIGN VALIDATION
+# SECTION 2: SYSTEM SELF-TEST AND MOCK CAMPAIGN VALIDATION
 # =====================================================================
 
 def execute_programmatic_self_test():
     """
     Executes mock program validations to test geometric schema parsing and
-    decryption handshake flows without external disk or server dependencies.
+    decryption flows without external disk dependencies.
     """
     log_info("Initializing internal programmatic self-tests...")
     
-    # 1. Test standard programmatic geometric constraints with valid values
     mock_geometry = {
         "format_version": "2.0.0",
         "resolution": {
@@ -753,7 +403,6 @@ def execute_programmatic_self_test():
         log_error("Self-Test Failed: Standard geometry schema structure validation failed.")
         return False
 
-    # 2. Test Z-height vertical check
     failing_geometry = {
         "format_version": "2.0.0",
         "resolution": {
@@ -764,7 +413,7 @@ def execute_programmatic_self_test():
             "walls": [
                 {
                     "id": "height_conflict", "type": "standard",
-                    "height": {"bottom": 12.0, "top": 5.0}, # Conflict: bottom > top
+                    "height": {"bottom": 12.0, "top": 5.0}, 
                     "path": [{"type": "move", "x": 0, "y": 0}, {"type": "line", "x": 10, "y": 10}]
                 }
             ],
@@ -775,7 +424,6 @@ def execute_programmatic_self_test():
         log_error("Self-Test Failed: Geometrical validator missed a Z-axis height conflict (bottom > top).")
         return False
 
-    # 3. Test entities schema validator
     mock_entities = {
         "landing_zones": [
             {"id": "lz1", "coordinates": [5.0, 5.0], "is_default": True, "heading_degrees": 90.0},
@@ -791,11 +439,10 @@ def execute_programmatic_self_test():
         log_error("Self-Test Failed: Standard entities validation parsing failed.")
         return False
 
-    # 4. Test Single-Default Landing Zone Limit
     failing_entities = {
         "landing_zones": [
             {"id": "lz1", "coordinates": [5.0, 5.0], "is_default": True, "heading_degrees": 90.0},
-            {"id": "lz2", "coordinates": [10.0, 10.0], "is_default": True, "heading_degrees": 180.0} # Fault: Multiple defaults
+            {"id": "lz2", "coordinates": [10.0, 10.0], "is_default": True, "heading_degrees": 180.0} 
         ]
     }
     if checker.validate_entities_schema(failing_entities):
@@ -807,7 +454,7 @@ def execute_programmatic_self_test():
 
 
 # =====================================================================
-# SECTION 4: MAIN EXECUTOR & CLI ROUTING
+# SECTION 3: MAIN EXECUTOR & CLI ROUTING
 # =====================================================================
 
 def main():
@@ -817,31 +464,15 @@ def main():
     )
     parser.add_argument(
         "archive", nargs="?", default=None,
-        help="Path to a target .uvtt2z or .gvtt campaign package to validate."
+        help="Path to a target .uvtt2z campaign package to validate."
     )
     parser.add_argument(
         "-s", "--self-test", action="store_true",
-        help="Execute the suite's built-in programmatic self-tests and cryptographic check pipelines."
+        help="Execute the suite's built-in programmatic self-tests."
     )
     parser.add_argument(
-        "--handshake", action="store_true",
-        help="Execute cryptographic edge clearinghouse verification handshakes."
-    )
-    parser.add_argument(
-        "--url", default=None,
-        help="Target Worker URL for ZKS handshake testing. If omitted, spins up a local mock server."
-    )
-    parser.add_argument(
-        "--secret", default="RETAILER_MASTER_CRITICAL_SECRET_2026_07_11",
-        help="The Retailer Master Secret for key derivation calculations."
-    )
-    parser.add_argument(
-        "--sku", default="SKU-DUNGEON-001",
-        help="Product SKU identifier."
-    )
-    parser.add_argument(
-        "--salt", default="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        help="Deterministic cryptographic salt."
+        "--key", default=None,
+        help="The 64-character hex AES-256 key to decrypt a locked archive."
     )
     parser.add_argument(
         "-q", "--quiet", action="store_true",
@@ -850,72 +481,26 @@ def main():
 
     args = parser.parse_args()
 
-    # Clear output screen header
     if not args.quiet:
         print(f"{COLOR_BOLD}{COLOR_BLUE}======================================================================{COLOR_RESET}")
         print(f"{COLOR_BOLD}       UVTT v2 System-Agnostic Verification & Conformance Suite       {COLOR_RESET}")
         print(f"{COLOR_BOLD}{COLOR_BLUE}======================================================================{COLOR_RESET}")
 
-    # No arguments provided fallback
-    if not args.archive and not args.self_test and not args.handshake:
+    if not args.archive and not args.self_test:
         parser.print_help()
         sys.exit(0)
 
     success = True
 
-    # Execution Phase 1: Programmatic Self-Tests
     if args.self_test:
         if not execute_programmatic_self_test():
             success = False
 
-    # Execution Phase 2: Live or Mock Cryptographic Handshake Pipeline
-    if args.handshake:
-        if not HAS_CRYPTO:
-            log_error("Cryptographic libraries ('PyJWT' or 'cryptography') are missing. Cannot run ZKS handshake suite.")
-            sys.exit(1)
-
-        server_thread = None
-        target_endpoint = args.url
-
-        # Spin up local mock background daemon if no endpoint is specified
-        if not target_endpoint:
-            log_info("No target Worker URL provided. Initializing local Mock Edge server...", args.quiet)
-            MockZKSWorkerHandler.generate_signing_keys()
-            MockZKSWorkerHandler.retailer_master_secret = args.secret.encode("utf-8")
-            
-            # Spin up on random open local port
-            local_server = HTTPServer(("127.0.0.1", 0), MockZKSWorkerHandler)
-            port = local_server.server_port
-            target_endpoint = f"http://127.0.0.1:{port}/v1/drm/handshake"
-            
-            server_thread = threading.Thread(target=local_server.serve_forever, daemon=True)
-            server_thread.start()
-            log_info(f"Local Mock server active on port {port}.", args.quiet)
-
-        # Execute tests
-        suite = CryptographicHandshakeSuite(target_endpoint, args.secret.encode("utf-8"))
-        
-        # If we spun up a local server, we feed the matching private key to forge mock JWTs
-        if server_thread:
-            suite.forge_test_tokens(MockZKSWorkerHandler.rsa_key_pair)
-        else:
-            # If testing a live server, we'd need its real signing key or predefined signed tokens.
-            # For automation checks against live systems without raw private keys, we verify basic auth errors.
-            log_warn("Testing a live Worker URL. Forging mock JWTs using default keys (may trigger validation errors).")
-            # Generate fake rsa key to test live pipeline rejection mechanics
-            private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-            suite.forge_test_tokens(private_key)
-
-        if not suite.run_handshake_tests():
-            success = False
-
-    # Execution Phase 3: Archive Conformance Checks
     if args.archive:
-        checker = UVTT2ConformanceChecker(args.archive, args.quiet, secret=args.secret, sku=args.sku, salt=args.salt)
+        checker = UVTT2ConformanceChecker(args.archive, args.quiet, key_hex=args.key)
         if not checker.run_all():
             success = False
 
-    # Final summary output
     if not args.quiet:
         print(f"\n{COLOR_BOLD}{COLOR_BLUE}======================================================================{COLOR_RESET}")
         print(f"{COLOR_BOLD}                        FINAL VERIFICATION STATUS                     {COLOR_RESET}")

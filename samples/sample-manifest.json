@@ -9,29 +9,6 @@
     "recommended_pipeline": "webgpu",
     "requires_compute_shaders": false
   },
-  "encryption_handshake": {
-    "clearinghouse_url": "https://licensing.universalvtt.org/v1/drm/handshake",
-    "license_authority": "https://auth.universalvtt.org/.well-known/jwks.json",
-    "key_salt_checksum": "a4d39f772b15e45a1f298cd310ba2dfc"
-  },
-  "environment": {
-    "global_wind": {
-      "speed": 5.0,
-      "angle": 45.0,
-      "gust_variance": 0.15
-    }
-  },
-  "audio": {
-    "music": {
-      "uri": "assets/global_combat_theme.ogg",
-      "volume": 0.75,
-      "crossfade_duration": 3.0
-    },
-    "ambience": {
-      "uri": "assets/global_storm_loop.ogg",
-      "volume": 0.4
-    }
-  },
   "map_catalog": [
     {
       "id": "ghuls-labyrinth-lvl1",
@@ -46,6 +23,13 @@
       "version": "1.0.0",
       "grid_color": "#ff000088",
       "ambient_fog_color": "#111122"
+    },
+    "environment": {
+      "global_wind": {
+        "speed": 5.0,
+        "angle": 45.0,
+        "gust_variance": 0.15
+      }
     }
   }
 }

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/sha256"
@@ -11,12 +13,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
-	"archive/zip"
-	"bytes"
 )
 
 // Simplified validation types for concurrency benchmarks
@@ -63,14 +62,12 @@ type ValidationResult struct {
 
 func main() {
 	// 1. Parse Command Line Arguments
-	targetFile := flag.String("file", "", "Path to the target .uvtt2z or .uvtt2k campaign archive.")
-	secretStr := flag.String("secret", "secret-retailer-key-12345", "Retailer master secret for key derivation handshakes.")
-	sku := flag.String("sku", "SKU-DUNGEON-001", "Campaign Product SKU.")
-	salt := flag.String("salt", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "The JWK key salt checksum.")
+	targetFile := flag.String("file", "", "Path to the target .uvtt2z or encrypted archive.")
+	keyHex := flag.String("key", "", "64-character hexadecimal AES-256 key for decryption.")
 	flag.Parse()
 
 	if *targetFile == "" {
-		fmt.Println("Usage: validate_conformance -file=<path_to_campaign.uvtt2z/.uvtt2k> [-secret=<key>] [-sku=<sku>] [-salt=<salt>]")
+		fmt.Println("Usage: validate_conformance -file=<path_to_campaign.uvtt2z> [-key=<hex_key>]")
 		os.Exit(1)
 	}
 
@@ -84,14 +81,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 3. Envelope Decryption pass if .uvtt2k
-	isEncrypted := strings.HasSuffix(*targetFile, ".uvtt2k")
+	// 3. Envelope Decryption pass if key is provided or file is encrypted
+	isEncrypted := *keyHex != "" || strings.HasSuffix(*targetFile, ".uvtt2k")
 	var zipData []byte
 	if isEncrypted {
+		if *keyHex == "" {
+			fmt.Println("[-] File appears to be encrypted but no -key flag was provided.")
+			os.Exit(1)
+		}
 		fmt.Println("[*] AES-256-GCM encrypted envelope detected. Executing stream decryption...")
-		zipData, err = decryptPayload(fileBytes, *secretStr, *sku, *salt)
+		zipData, err = decryptPayload(fileBytes, *keyHex)
 		if err != nil {
-			fmt.Printf("[-] Cryptographic handshake decryption failed: %v\n", err)
+			fmt.Printf("[-] Decryption failed: %v\n", err)
 			os.Exit(1)
 		}
 		fmt.Println("[+] In-memory AES-GCM container stream extraction successful.")
@@ -202,16 +203,17 @@ func main() {
 	fmt.Println("[+] ALL SECURE GATES PASSED SUCCESSFULLY. Binary package conforms fully to the UVTT v2 specification.")
 }
 
-func decryptPayload(encrypted []byte, secret, sku, salt string) ([]byte, error) {
+func decryptPayload(encrypted []byte, keyHex string) ([]byte, error) {
 	if len(encrypted) < 12 {
 		return nil, errors.New("encrypted payload too small")
 	}
 
-	hasher := sha256.New()
-	hasher.Write([]byte(sku + salt))
-	hashBytes := hasher.Sum([]byte(secret))
+	keyBytes, err := hex.DecodeString(keyHex)
+	if err != nil {
+		return nil, fmt.Errorf("invalid hex key: %v", err)
+	}
 
-	block, err := aes.NewCipher(hashBytes[:32])
+	block, err := aes.NewCipher(keyBytes)
 	if err != nil {
 		return nil, err
 	}

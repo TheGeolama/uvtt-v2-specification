@@ -59,11 +59,12 @@ find_script() {
     local filename="$1"
     local paths=(
         "."
+        "tests"
+        "tools"
         "scratch"
         "artifacts"
         "/workspace"
-        "/workspace/scratch"
-        "/workspace/artifacts"
+        "/workspace/tests"
     )
     for p in "${paths[@]}"; do
         if [ -f "$p/$filename" ]; then
@@ -131,62 +132,23 @@ if [ $EXIT_CODE -ne 0 ]; then
 fi
 
 # ------------------------------------------------------------------------------
-# STEP 2: Run Cryptographic Decryption Handshake Tests
+# STEP 2: Conformance and Geometry Validation
 # ------------------------------------------------------------------------------
 echo ""
 print_header
-print_status "Step 2: Testing Serverless Handshake Decryption & ZKS Gates"
+print_status "Step 2: Verification of Campaign Metadata & Spatial Topology"
 
-HANDSHAKE_SUITE=$(find_script "test-handshake-suite.py")
-if [ $? -eq 0 ]; then
-    print_status "Running $HANDSHAKE_SUITE in daemon mock mode..."
-    python3 "$HANDSHAKE_SUITE" --mock
-    TEST_RESULT=$?
-    if [ $TEST_RESULT -eq 0 ]; then
-        print_success "All 5 cryptographic edge clearinghouse handshake tests passed."
-    else
-        print_error "Serverless handshake test suite flagged failures (Exit Code: $TEST_RESULT)."
-        EXIT_CODE=1
-    fi
-else
-    # Check alternate naming conventions inside scratch if present
-    ALT_HANDSHAKE_SUITE=$(find_script "test_handshake_suite.py")
-    if [ $? -eq 0 ]; then
-        print_status "Running $ALT_HANDSHAKE_SUITE in daemon mock mode..."
-        python3 "$ALT_HANDSHAKE_SUITE" --mock
-        TEST_RESULT=$?
-        if [ $TEST_RESULT -eq 0 ]; then
-            print_success "All 5 cryptographic edge clearinghouse handshake tests passed."
-        else
-            print_error "Serverless handshake test suite flagged failures (Exit Code: $TEST_RESULT)."
-            EXIT_CODE=1
-        fi
-    else
-        print_warning "Cryptographic handshake suite (test-handshake-suite.py) not found in working directories."
-    fi
-fi
-
-# ------------------------------------------------------------------------------
-# STEP 3: Conformance and Geometry Validation
-# ------------------------------------------------------------------------------
-echo ""
-print_header
-print_status "Step 3: Verification of Campaign Metadata & Spatial Topology"
-
-VALIDATOR_SCRIPT=$(find_script "verify-uvtt2-conformance.py")
-if [ $? -ne 0 ]; then
-    # Try alternate naming
-    VALIDATOR_SCRIPT=$(find_script "verify_uvtt2_conformance.py")
-fi
+VALIDATOR_SCRIPT=$(find_script "master-test-suite.py")
 
 if [ -z "$VALIDATOR_SCRIPT" ] || [ ! -f "$VALIDATOR_SCRIPT" ]; then
-    print_warning "Conformance validator (verify-uvtt2-conformance.py) not found. Skipping."
+    print_error "Conformance validator (master-test-suite.py) not found in tests/ directory. Aborting."
+    EXIT_CODE=1
 else
     # Option A: Run automated self-test
     if [ "$RUN_SELF_TEST" = true ] || [ -z "$TARGET_MAP" ]; then
         print_status "No target map archive provided, or --self-test flag active."
         print_status "Executing internal programmatic self-tests inside $VALIDATOR_SCRIPT..."
-        python3 "$VALIDATOR_SCRIPT" --self-test
+        python3 "$VALIDATOR_SCRIPT" -s
         SELF_TEST_RESULT=$?
         if [ $SELF_TEST_RESULT -eq 0 ]; then
             print_success "Internal validator self-test executed successfully."
@@ -199,47 +161,37 @@ else
     # Option B: Validate user's specific map file
     if [ -n "$TARGET_MAP" ]; then
         print_status "Analyzing target campaign file: $TARGET_MAP"
-        if [ -f "$TARGET_MAP" ]; then
-            python3 "$VALIDATOR_SCRIPT" "$TARGET_MAP"
+        
+        RESOLVED_MAP="$TARGET_MAP"
+        if [ ! -f "$RESOLVED_MAP" ]; then
+            RESOLVED_MAP=$(find_script "$TARGET_MAP")
+        fi
+
+        if [ -n "$RESOLVED_MAP" ] && [ -f "$RESOLVED_MAP" ]; then
+            python3 "$VALIDATOR_SCRIPT" "$RESOLVED_MAP"
             MAP_TEST_RESULT=$?
             if [ $MAP_TEST_RESULT -eq 0 ]; then
-                print_success "File '$TARGET_MAP' conforms fully to the UVTT v2.0.0-rc1 standard!"
+                print_success "File '$RESOLVED_MAP' conforms fully to the UVTT v2.0.0-rc1 standard!"
             else
-                print_error "File '$TARGET_MAP' failed structural/cryptographic validation (Exit Code: $MAP_TEST_RESULT)."
+                print_error "File '$RESOLVED_MAP' failed structural/cryptographic validation (Exit Code: $MAP_TEST_RESULT)."
                 EXIT_CODE=1
             fi
         else
-            # Try to resolve map path in other dirs too
-            RESOLVED_MAP=$(find_script "$TARGET_MAP")
-            if [ $? -eq 0 ]; then
-                python3 "$VALIDATOR_SCRIPT" "$RESOLVED_MAP"
-                MAP_TEST_RESULT=$?
-                if [ $MAP_TEST_RESULT -eq 0 ]; then
-                    print_success "File '$RESOLVED_MAP' conforms fully to the UVTT v2.0.0-rc1 standard!"
-                else
-                    print_error "File '$RESOLVED_MAP' failed structural/cryptographic validation (Exit Code: $MAP_TEST_RESULT)."
-                    EXIT_CODE=1
-                fi
-            else
-                print_error "Target map file not found: $TARGET_MAP"
-                EXIT_CODE=1
-            fi
+            print_error "Target map file not found: $TARGET_MAP"
+            EXIT_CODE=1
         fi
     fi
 fi
 
 # ------------------------------------------------------------------------------
-# STEP 4: Server-side Go Binary Validation (Optional)
+# STEP 3: Server-side Go Binary Validation (Optional)
 # ------------------------------------------------------------------------------
-if [ "$HAS_GO" = true ]; then
+if [ "$HAS_GO" = true ] && [ $EXIT_CODE -eq 0 ]; then
     echo ""
     print_header
-    print_status "Step 4: Compiling and Running Server-Side Go Validator"
+    print_status "Step 3: Compiling and Running Server-Side Go Validator"
     
     GO_SCRIPT=$(find_script "validate_conformance.go")
-    if [ $? -ne 0 ]; then
-        GO_SCRIPT=$(find_script "validate-conformance.go")
-    fi
     
     if [ -n "$GO_SCRIPT" ] && [ -f "$GO_SCRIPT" ]; then
         print_status "Compiling $GO_SCRIPT to local build binary..."
@@ -257,7 +209,7 @@ if [ "$HAS_GO" = true ]; then
                 
                 if [ -n "$RESOLVED_MAP" ] && [ -f "$RESOLVED_MAP" ]; then
                     print_status "Running binary validation on $RESOLVED_MAP..."
-                    ./uvtt2-validator "$RESOLVED_MAP"
+                    ./uvtt2-validator -file="$RESOLVED_MAP"
                     GO_RUN_RESULT=$?
                     if [ $GO_RUN_RESULT -eq 0 ]; then
                         print_success "Go binary confirmed structural & Landing Zone integrity!"

@@ -232,7 +232,8 @@
             "type": "string",
             "enum": [
               "teleport",
-              "trap"
+              "trap",
+              "trigger"
             ]
           },
           "trigger_bounds": {
@@ -424,11 +425,52 @@
     },
     "audio": {
       "type": "object",
-      "required": [
-        "zones"
-      ],
       "additionalProperties": false,
       "properties": {
+        "music": {
+          "type": "object",
+          "required": [
+            "uri",
+            "volume"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "uri": {
+              "type": "string"
+            },
+            "volume": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "crossfade_duration": {
+              "type": "number",
+              "minimum": 0.0
+            }
+          }
+        },
+        "ambience": {
+          "type": "object",
+          "required": [
+            "uri",
+            "volume"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "uri": {
+              "type": "string"
+            },
+            "volume": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "crossfade_duration": {
+              "type": "number",
+              "minimum": 0.0
+            }
+          }
+        },
         "zones": {
           "type": "array",
           "description": "Localized, proximity-based acoustic zones.",

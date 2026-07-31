@@ -3,7 +3,8 @@
  *
  * Client-Side Conformance Verifier.
  * Simulates a Virtual Tabletop (VTT) client engine importing a cryptographically-signed
- * .uvtt2z archive, validating integrity hashes, and performing volatile memory decryption.
+ * .uvtt2z archive, validating integrity hashes, and performing volatile memory decryption
+ * utilizing the dual-file physical key structure (.uvtt2k).
  */
 
 const crypto = require('crypto');
@@ -14,13 +15,11 @@ const AdmZip = require('adm-zip');
 class ClientArchiveVerifier {
   /**
    * @param {string} archivePath - Local path to the signed .uvtt2z file.
-   * @param {string} retailerSecret - Securing key for handshake simulation.
-   * @param {string} sku - Product identifier.
+   * @param {string} keyHex - The 64-character raw AES-256 decryption key.
    */
-  constructor(archivePath, retailerSecret, sku) {
+  constructor(archivePath, keyHex) {
     this.archivePath = archivePath;
-    this.retailerSecret = retailerSecret;
-    this.sku = sku;
+    this.keyHex = keyHex;
   }
 
   /**
@@ -79,27 +78,7 @@ class ClientArchiveVerifier {
     }
     console.log("[+] Security Scan: Root signature verified successfully. No malicious coordinates injected.");
 
-    // 4. Extract Key Salt and simulate Zero-Knowledge Key Handshake
-    console.log("[*] Processing manifest.json metadata for handshakes...");
-    const manifestEntry = zip.getEntry('manifest.json');
-    if (!manifestEntry) {
-      throw new Error("Validation Error: Root manifest.json not found inside archive.");
-    }
-
-    const manifest = JSON.parse(manifestEntry.getData().toString('utf8'));
-    const salt = manifest.encryption_handshake?.key_salt_checksum;
-    if (!salt) {
-      throw new Error("License Handshake Error: Key salt is missing from manifest encryption variables.");
-    }
-
-    console.log(`[*] Initiating ZKS Edge Handshake. Key Salt: ${salt}`);
-    // Derived Key = HMAC-SHA256(MasterSecret, SKU + Salt)
-    const hmac = crypto.createHmac('sha256', this.retailerSecret);
-    hmac.update(this.sku + salt);
-    const derivedKey = hmac.digest();
-    console.log(`[+] Key derived successfully. Initializing Volatile Decryption Context.`);
-
-    // 5. Decrypt secure asset and assert output integrity
+    // 4. Decrypt secure asset and assert output integrity
     console.log("[*] Decrypting protected visual rasters (/protected/)...");
     const encryptedMapEntry = zip.getEntry('protected/map.webp.enc');
     if (!encryptedMapEntry) {
@@ -107,13 +86,14 @@ class ClientArchiveVerifier {
     }
 
     const encryptedData = encryptedMapEntry.getData();
+    const aesKey = Buffer.from(this.keyHex, 'hex');
     
     // Slice AES-256-GCM binary stack: [IV (12B)] + [Ciphertext] + [Auth Tag (16B)]
     const iv = encryptedData.subarray(0, 12);
     const authTag = encryptedData.subarray(encryptedData.length - 16);
     const ciphertext = encryptedData.subarray(12, encryptedData.length - 16);
 
-    const decipher = crypto.createDecipheriv('aes-256-gcm', derivedKey, iv);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', aesKey, iv);
     decipher.setAuthTag(authTag);
 
     const decryptedBuffer = Buffer.concat([
@@ -125,8 +105,8 @@ class ClientArchiveVerifier {
     console.log(`    Total Decrypted Buffer Size: ${decryptedBuffer.length} bytes.`);
     
     // Volatile Memory Disposal Protocol: hard-overwrite variables to wipe cache
-    derivedKey.fill(0);
-    console.log("[+] Volatile Memory Purged. Derived cryptographic secrets successfully flushed.");
+    aesKey.fill(0);
+    console.log("[+] Volatile Memory Purged. Cryptographic secrets successfully flushed.");
     console.log("======================================================================");
     console.log("            UVTT v2 - SECURE ARCHIVE VERIFICATION PASSED              ");
     console.log("======================================================================");
@@ -136,22 +116,14 @@ class ClientArchiveVerifier {
 // Self-Test Execution Module
 async function runSelfTest() {
   const mockMapData = Buffer.from("HIGH_RESOLUTION_8K_TACTICAL_MAP_DATA_IMAGE_STREAM_abc123xyz_MARKER");
-  const mockSku = "SKU-90218-PTOLUS";
-  const mockSalt = "a4d39f772b15e45a1f298cd310ba2dfc";
-  const mockSecret = "RETAILER_SECRET_KEY_abc123xyz789";
-
-  const { PublisherResigningPipeline } = require('./publisher-resign-pipeline');
-  const pipeline = new PublisherResigningPipeline(mockSecret);
+  // Generate a random 256-bit (32-byte) key for the mock encryption
+  const mockKeyBytes = crypto.randomBytes(32);
+  const mockKeyHex = mockKeyBytes.toString('hex');
 
   const mockManifest = {
     format_version: "2.0.0",
     uvtt_version: "2.0.0",
     campaign_name: "Mock Campaign Level",
-    encryption_handshake: {
-      clearinghouse_url: "http://127.0.0.1:8787/v1/drm/handshake",
-      license_authority: "http://127.0.0.1:8787/.well-known/jwks.json",
-      key_salt_checksum: mockSalt
-    },
     map_catalog: [
       { id: "mock-map", name: "Mock Map", slug: "mock-map", path: "maps/ground_floor/", z_index: 0 }
     ]
@@ -161,20 +133,37 @@ async function runSelfTest() {
   const mockEntities = { format_version: "2.0.0", lights: [], landing_zones: [], events: [], audio: { zones: [] }, emitters: [] };
 
   console.log("[*] Preparing test environment: compiling self-test zip archive...");
-  const archiveBuffer = await pipeline.resignAndCompile({
-    sku: mockSku,
-    saltHex: mockSalt,
-    highResMap: mockMapData,
-    manifest: mockManifest,
-    geometry: mockGeometry,
-    entities: mockEntities
-  });
+  const zip = new AdmZip();
+
+  // Add JSON files
+  zip.addFile('manifest.json', Buffer.from(JSON.stringify(mockManifest, null, 2)));
+  zip.addFile('maps/ground_floor/geometry.json', Buffer.from(JSON.stringify(mockGeometry, null, 2)));
+  zip.addFile('maps/ground_floor/entities.json', Buffer.from(JSON.stringify(mockEntities, null, 2)));
+  zip.addFile('assets/basemap.webp', Buffer.from("MOCK_BASEMAP"));
+
+  // Encrypt protected payload
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', mockKeyBytes, iv);
+  const ciphertext = Buffer.concat([cipher.update(mockMapData), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  const encryptedPayload = Buffer.concat([iv, ciphertext, authTag]);
+  zip.addFile('protected/map.webp.enc', encryptedPayload);
+
+  // Compute Hashes
+  const zipEntries = zip.getEntries();
+  const hashLines = [];
+  for (const entry of zipEntries) {
+    const fileData = entry.getData();
+    const sha256Hash = crypto.createHash('sha256').update(fileData).digest('hex');
+    hashLines.push(`${entry.entryName}:${sha256Hash}`);
+  }
+  zip.addFile('manifest.hash', Buffer.from(hashLines.join('\n') + '\n'));
 
   const tempArchivePath = path.join(__dirname, 'mock_test_archive.uvtt2z');
-  fs.writeFileSync(tempArchivePath, archiveBuffer);
+  fs.writeFileSync(tempArchivePath, zip.toBuffer());
 
   try {
-    const verifier = new ClientArchiveVerifier(tempArchivePath, mockSecret, mockSku);
+    const verifier = new ClientArchiveVerifier(tempArchivePath, mockKeyHex);
     await verifier.verify();
   } finally {
     // Clean up temporary workspace artifacts

@@ -26,7 +26,7 @@ import sys
 import json
 from jsonschema import Draft7Validator
 
-schemas = ['schemas/manifest.schema.json', 'schemas/geometry.schema.json', 'schemas/entities.schema.json']
+schemas = ['schemas/manifest.schema.json', 'schemas/geometry.schema.json', 'schemas/entities.schema.json', 'schemas/assets.schema.json']
 for schema_path in schemas:
     try:
         with open(schema_path, 'r') as f:
@@ -43,7 +43,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo -e "${BLUE}[*] Running Master Conformance Test Suite...${NC}"
-python3 tests/master-test-suite.py
+python3 tests/master-test-suite.py -s
 if [ $? -ne 0 ]; then
     echo -e "${RED}[-] CONFORMANCE FAILURE: Fix layout issues before committing.${NC}"
     exit 1

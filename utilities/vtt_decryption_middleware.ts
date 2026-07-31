@@ -2,12 +2,12 @@
  * UVTT v2 - Standard VTT-side Decryption Middleware
  * 
  * Demonstrates how client-side VTT engines can parse the AES-GCM encrypted assets (like .webp maps),
- * extract the initialization vector (IV), perform hardware-accelerated decryption via W3C Web Crypto,
- * and instantiate a secure Blob URL for immediate render injection.
+ * extract the initialization vector (IV), perform hardware-accelerated decryption via W3C Web Crypto
+ * using a raw hex string from a `.uvtt2k` key file, and instantiate a secure Blob URL for immediate render injection.
  */
 
 export interface DecryptionOptions {
-  keyHex: string;          // 256-bit AES key as a hex string
+  keyHex: string;          // 256-bit AES key as a hex string (from a .uvtt2k file or Storefront API)
   encryptedBuffer: ArrayBuffer; // Raw binary of the encrypted asset
   mimeType?: string;       // Default is "image/webp"
 }
@@ -77,6 +77,10 @@ export async function decryptAssetToBlobUrl(options: DecryptionOptions): Promise
     // 7. Generate a local Object URL to immediately stream into map layout engines
     const blobUrl = URL.createObjectURL(decryptedBlob);
     console.log(`[✔] Cryptographic verification complete. Compiled secure asset Blob URL: ${blobUrl}`);
+    
+    // Volatile Memory Scrubbing
+    rawKeyBytes.fill(0);
+    
     return blobUrl;
 
   } catch (error) {
@@ -163,6 +167,9 @@ export async function decryptAssetToGpuTexture(options: WebGpuTextureLoaderOptio
         console.log("[✔] Volatile memory scrubbing: Released decrypted offscreen ImageBitmap from host memory.");
       }
     };
+
+    // Clean up temporary key bytes
+    rawKeyBytes.fill(0);
 
     console.log(`[✔] Decrypted asset rasterized off-thread: ${payload.width}x${payload.height}px.`);
     return payload;

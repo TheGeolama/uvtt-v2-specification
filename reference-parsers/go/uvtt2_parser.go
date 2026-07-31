@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -25,9 +24,9 @@ const (
 
 // Resolution and Topology Definitions
 type Topology struct {
-	Type           string   `json:"type"`                     // square, hex, isometric
-	Orientation    string   `json:"orientation,omitempty"`    // flat_top, pointy_top
-	Offset         string   `json:"offset,omitempty"`         // odd_row, even_row, odd_col, even_col
+	Type           string   `json:"type"`                      // square, hex, isometric
+	Orientation    string   `json:"orientation,omitempty"`     // flat_top, pointy_top
+	Offset         string   `json:"offset,omitempty"`          // odd_row, even_row, odd_col, even_col
 	IsometricRatio *float64 `json:"isometric_ratio,omitempty"` // typically 0.5 (2:1 projection)
 }
 
@@ -88,9 +87,9 @@ type HeightRange struct {
 }
 
 type PathNode struct {
-	Type string    `json:"type"` // move, line, bezier
-	X    *float64  `json:"x,omitempty"`
-	Y    *float64  `json:"y,omitempty"`
+	Type string     `json:"type"` // move, line, bezier
+	X    *float64   `json:"x,omitempty"`
+	Y    *float64   `json:"y,omitempty"`
 	CP1  *MapOrigin `json:"cp1,omitempty"`
 	CP2  *MapOrigin `json:"cp2,omitempty"`
 	To   *MapOrigin `json:"to,omitempty"`
@@ -119,13 +118,13 @@ type Wall struct {
 }
 
 type Portal struct {
-	ID         string      `json:"id"`
-	Type       string      `json:"type"` // door
-	SubType    string      `json:"sub_type,omitempty"` // standard, secret
-	State      string      `json:"state"` // open, closed, locked, broken
-	Height     HeightRange `json:"height"`
-	Blocks     []string    `json:"blocks"`
-	Line       struct {
+	ID      string      `json:"id"`
+	Type    string      `json:"type"`               // door
+	SubType string      `json:"sub_type,omitempty"` // standard, secret
+	State   string      `json:"state"`              // open, closed, locked, broken
+	Height  HeightRange `json:"height"`
+	Blocks  []string    `json:"blocks"`
+	Line    struct {
 		P1 MapOrigin `json:"p1"`
 		P2 MapOrigin `json:"p2"`
 	} `json:"line"`
@@ -134,11 +133,11 @@ type Portal struct {
 }
 
 type Roof struct {
-	ID         string      `json:"id"`
-	Type       string      `json:"type"` // roof
-	Height     HeightRange `json:"height"`
-	Polygon    []MapOrigin `json:"polygon"`
-	Image      struct {
+	ID      string      `json:"id"`
+	Type    string      `json:"type"` // roof
+	Height  HeightRange `json:"height"`
+	Polygon []MapOrigin `json:"polygon"`
+	Image   struct {
 		URI string `json:"uri"`
 	} `json:"image"`
 	Visibility string `json:"visibility,omitempty"`
@@ -168,9 +167,9 @@ type LightAnimation struct {
 }
 
 type Light struct {
-	ID           string          `json:"id"`
-	Type         string          `json:"type"` // point, directional
-	Position     struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"` // point, directional
+	Position struct {
 		X float64 `json:"x"`
 		Y float64 `json:"y"`
 		Z float64 `json:"z"`
@@ -186,8 +185,8 @@ type Light struct {
 }
 
 type LandingZoneProperties struct {
-	Description      string  `json:"description,omitempty"`
-	CameraZoomLevel  float64 `json:"camera_zoom_level,omitempty"`
+	Description     string  `json:"description,omitempty"`
+	CameraZoomLevel float64 `json:"camera_zoom_level,omitempty"`
 }
 
 type LandingZone struct {
@@ -222,15 +221,15 @@ type EventDestination struct {
 }
 
 type Event struct {
-	ID               string            `json:"id"`
-	Type             string            `json:"type"` // teleport, trap, trigger
-	TriggerBounds    struct {
+	ID            string `json:"id"`
+	Type          string `json:"type"` // teleport, trap, trigger
+	TriggerBounds struct {
 		Shape  string      `json:"shape"` // polygon, circle
 		Points []MapOrigin `json:"points,omitempty"`
 		Center *MapOrigin  `json:"center,omitempty"`
 		Radius *float64    `json:"radius,omitempty"`
 	} `json:"trigger_bounds"`
-	Conditions       struct {
+	Conditions struct {
 		RequiresInteraction bool     `json:"requires_interaction"`
 		InteractionKey      string   `json:"interaction_key,omitempty"`
 		AllowedModes        []string `json:"allowed_modes,omitempty"`
@@ -282,10 +281,10 @@ type WeatherProperties struct {
 }
 
 type WeatherEmitter struct {
-	ID         string            `json:"id"`
-	Type       string            `json:"type"` // rain, snow, fog, embers, magic
-	IsGlobal   bool              `json:"is_global"`
-	Bounds     *struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"` // rain, snow, fog, embers, magic
+	IsGlobal bool   `json:"is_global"`
+	Bounds   *struct {
 		Shape  string      `json:"shape"`
 		Points []MapOrigin `json:"points"`
 	} `json:"bounds,omitempty"`
@@ -341,16 +340,16 @@ type StandaloneAssetPropAutoEmit struct {
 }
 
 type StandaloneAssetProp struct {
-	ID            string                        `json:"id"`
-	File          string                        `json:"file"`
-	Name          string                        `json:"name"`
-	DefaultScale  float64                       `json:"default_scale,omitempty"`
+	ID            string  `json:"id"`
+	File          string  `json:"file"`
+	Name          string  `json:"name"`
+	DefaultScale  float64 `json:"default_scale,omitempty"`
 	GridFootprint struct {
 		WidthInGrids  float64 `json:"width_in_grids"`
 		HeightInGrids float64 `json:"height_in_grids"`
 	} `json:"grid_footprint"`
-	Tags       []string                      `json:"tags,omitempty"`
-	AutoEmits  []StandaloneAssetPropAutoEmit `json:"auto_emits,omitempty"`
+	Tags      []string                      `json:"tags,omitempty"`
+	AutoEmits []StandaloneAssetPropAutoEmit `json:"auto_emits,omitempty"`
 }
 
 type AssetManifest struct {
@@ -367,25 +366,23 @@ type AssetManifest struct {
 }
 
 // IngestEngine reads, decrypts, and conformance-audits UVTT v2 files
-type IngestEngine struct {
-	MasterSecret []byte
-}
+type IngestEngine struct{}
 
-func NewIngestEngine(secret []byte) *IngestEngine {
-	return &IngestEngine{MasterSecret: secret}
+func NewIngestEngine() *IngestEngine {
+	return &IngestEngine{}
 }
 
 // IngestPackage parses and fully audits a raw zip file stream
-func (ie *IngestEngine) IngestPackage(zipBytes []byte, isEncrypted bool, sku string, salt string) (*Manifest, map[string][]byte, error) {
+func (ie *IngestEngine) IngestPackage(zipBytes []byte, isEncrypted bool, aesKey []byte) (*Manifest, map[string][]byte, error) {
 	var err error
 	var rawZip []byte
 
 	// 1. Handle Decryption if Encrypted (.uvtt2k)
 	if isEncrypted {
-		if len(ie.MasterSecret) == 0 {
-			return nil, nil, errors.New("cannot decrypt .uvtt2k envelope without an authorized master secret")
+		if len(aesKey) == 0 {
+			return nil, nil, errors.New("cannot decrypt .uvtt2z envelope without a valid AES-256 key")
 		}
-		rawZip, err = ie.DecryptGCMEnvelope(zipBytes, sku, salt)
+		rawZip, err = ie.DecryptGCMEnvelope(zipBytes, aesKey)
 		if err != nil {
 			return nil, nil, fmt.Errorf("cryptographic envelope decryption failed: %v", err)
 		}
@@ -465,16 +462,12 @@ func (ie *IngestEngine) IngestPackage(zipBytes []byte, isEncrypted bool, sku str
 	return &manifest, fileMap, nil
 }
 
-func (ie *IngestEngine) DecryptGCMEnvelope(encryptedBytes []byte, sku, salt string) ([]byte, error) {
+func (ie *IngestEngine) DecryptGCMEnvelope(encryptedBytes []byte, aesKey []byte) ([]byte, error) {
 	if len(encryptedBytes) < 12 {
 		return nil, errors.New("encrypted payload size underflow")
 	}
 
-	mac := sha256.New()
-	mac.Write([]byte(sku + salt))
-	derivedKey := mac.Sum(ie.MasterSecret)
-
-	block, err := aes.NewCipher(derivedKey[:32])
+	block, err := aes.NewCipher(aesKey)
 	if err != nil {
 		return nil, err
 	}
@@ -595,7 +588,7 @@ func (ie *IngestEngine) AuditMapLayer(fileMap map[string][]byte, path string) er
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: uvtt2_parser <path_to_archive.uvtt2z / .uvtt2k>")
+		fmt.Println("Usage: uvtt2_parser <path_to_archive.uvtt2z> [path_to_key.uvtt2k]")
 		os.Exit(0)
 	}
 
@@ -606,13 +599,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	isEncrypted := strings.HasSuffix(archivePath, ".uvtt2k")
-	secret := []byte("secret-retailer-key-12345")
-	sku := "SKU-DUNGEON-001"
-	salt := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	isEncrypted := len(os.Args) >= 3
+	var aesKey []byte
 
-	engine := NewIngestEngine(secret)
-	manifest, _, err := engine.IngestPackage(archiveBytes, isEncrypted, sku, salt)
+	if isEncrypted {
+		keyPath := os.Args[2]
+		keyBytes, err := os.ReadFile(keyPath)
+		if err != nil {
+			fmt.Printf("Error reading key file: %v\n", err)
+			os.Exit(1)
+		}
+		// Decode the raw hex string directly into bytes
+		keyHex := strings.TrimSpace(string(keyBytes))
+		aesKey, err = hex.DecodeString(keyHex)
+		if err != nil {
+			fmt.Printf("Error decoding hex key: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	engine := NewIngestEngine()
+	manifest, _, err := engine.IngestPackage(archiveBytes, isEncrypted, aesKey)
 	if err != nil {
 		fmt.Printf("[-] CONFORMANCE AUDIT REJECTED: %v\n", err)
 		os.Exit(1)

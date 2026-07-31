@@ -23,6 +23,10 @@
   color: "fbca04"
   description: "Related to entities.json (lights, events, audio, emitters, spawns)."
 
+- name: "spec: assets"
+  color: "e3c1fa"
+  description: "Related to standalone assets.schema.json (Tokens, Audio, Props)."
+
 - name: "parser: go"
   color: "00ADD8"
   description: "Modifications to the Go reference implementation."
@@ -61,4 +65,4 @@
 
 - name: "area: security"
   color: "e99695"
-  description: "Security layers, split-resolution DRM, signatures, or Web Crypto integrations."
+  description: "Dual-File DRM (.uvtt2k), split-resolution cryptography, or Web Crypto integrations."

@@ -1,5 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://universalvtt.org/schemas/v2/assets.schema.json",
   "title": "UVTT v2 Asset Manifest Schema",
   "description": "Defines metadata registries, grid scaling, and automatic entity emissions for standalone UVTT asset archives (.uvtt2a).",
   "type": "object",
@@ -13,9 +14,7 @@
   "properties": {
     "format_version": {
       "type": "string",
-      "enum": [
-        "2.0.0"
-      ]
+      "const": "2.0.0"
     },
     "package_type": {
       "type": "string",

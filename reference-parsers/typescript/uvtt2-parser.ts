@@ -1,6 +1,6 @@
 /**
  * Universal Virtual Tabletop Version 2 (UVTT v2) TypeScript Reference Parser
- * File: uvtt2_parser.tst (TypeScript Reference Implementation)
+ * File: uvtt2_parser.ts (TypeScript Reference Implementation)
  * 
  * Standards Body: Open Virtual Tabletop Consortium (OVTC)
  * Format Version: 2.0.0 (Final Production Specification)
@@ -375,73 +375,45 @@ export interface AssetManifest {
 // ============================================================================
 
 export class Uvtt2Parser {
-  private masterSecret: Uint8Array | null = null;
-
-  constructor(secretHex?: string) {
-    if (secretHex) {
-      this.masterSecret = this.hexToUint8Array(secretHex);
-    }
+  constructor() {
+    // The Web SPA should not maintain a master secret state
   }
 
   /**
-   * Performs standard deterministic key derivation (ZKS Mode) and decrypts the GCM envelope
-   * matching our serverless edge Worker formula.
+   * Decrypts the GCM envelope directly using the provided raw AES-256 key hex.
+   * Replaces deprecated ZKS edge derivation logic.
    */
-  public async decryptGCMEnvelope(
+  public async decryptPayload(
     encryptedData: ArrayBuffer,
-    sku: string,
-    saltHex: string
+    rawKeyHex: string
   ): Promise<ArrayBuffer> {
-    if (!this.masterSecret) {
-      throw new Error("Volatile Cryptographic State Conflict: No master secret configured.");
-    }
-
     if (encryptedData.byteLength < 12 + 16) {
       throw new Error("Cryptographic Fault: Encrypted envelope size underflow.");
     }
 
-    const salt = this.hexToUint8Array(saltHex);
-    const skuBytes = new TextEncoder().encode(sku);
+    const keyBytes = this.hexToUint8Array(rawKeyHex);
 
-    // Conjoin SKU and salt into a single message
-    const message = new Uint8Array(skuBytes.length + salt.length);
-    message.set(skuBytes, 0);
-    message.set(salt, skuBytes.length);
-
-    // Derived Key = HMAC-SHA256(MasterSecret, SKU + Salt)
+    // Import the raw AES-256 key directly
     const cryptoKey = await crypto.subtle.importKey(
       "raw",
-      this.masterSecret,
-      { name: "HMAC", hash: { name: "SHA-256" } },
-      false,
-      ["sign"]
-    );
-
-    const signature = await crypto.subtle.sign("HMAC", cryptoKey, message);
-    const derivedKeyBytes = new Uint8Array(signature);
-
-    // Import derived key for AES-GCM
-    const aesKey = await crypto.subtle.importKey(
-      "raw",
-      derivedKeyBytes.subarray(0, 32), // Slice to 256 bits
-      { name: "AES-GCM" },
+      keyBytes,
+      { name: "AES-GCM", length: 256 },
       false,
       ["decrypt"]
     );
 
     // Extract Nonce (first 12 bytes) and ciphertext
-    const nonce = encryptedData.slice(0, 12);
-    const ciphertext = encryptedData.slice(12);
+    const nonce = new Uint8Array(encryptedData.slice(0, 12));
+    const ciphertext = new Uint8Array(encryptedData.slice(12));
 
     const plaintext = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv: nonce },
-      aesKey,
+      cryptoKey,
       ciphertext
     );
 
-    // Volatile Memory Scrubbing: Fill cryptographic derived keys with zero instantly
-    derivedKeyBytes.fill(0);
-    message.fill(0);
+    // Volatile Memory Scrubbing: Fill cryptographic keys with zero instantly
+    keyBytes.fill(0);
 
     return plaintext;
   }

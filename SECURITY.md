@@ -1,60 +1,50 @@
-### 🛡️ Security Policy
+# Security Policy for UVTT v2
 
-#### Supported Versions
-Only the active release branch of the **Universal Virtual Tabletop v2 (UVTT v2) Specification** and the **UVTT v2 Upgrader Web App** are actively monitored for security vulnerabilities.
+## 1. Introduction
 
-| Version | Supported |
-| ------ | ------ |
-| v2.0.x | ✅ Yes |
-| v1.x.x | ❌ No |
+Security is a foundational pillar of the UVTT v2 ecosystem. Because the V2 standard involves parsing compressed archives (`.uvtt2z`), handling cryptographic keys (`.uvtt2k`), and rendering complex spatial data, we take vulnerability reports extremely seriously.
 
-Legacy V1 files (.dd2vtt, .df2vtt) do not implement cryptographic signatures, hash index verifications, or secure zero-knowledge access controls and are fundamentally considered insecure. All platforms are strongly urged to migrate to the UVTT v2 standard to protect creator assets and secure user platforms [45].
+This document outlines our supported versions, how to report a vulnerability, and our established threat model.
 
 ---
 
-#### Reporting a Vulnerability
-We take the security of TTRPG creators, digital artists, and platform developers extremely seriously [46]. If you discover a security vulnerability, **please do not open a public GitHub issue [46].** Instead, report it through one of the following secure channels:
+## 2. Supported Versions
 
-1.  **GitHub Private Vulnerability Reporting:** Navigate to the **Security** tab of the repository on GitHub and click **"Report a vulnerability"** [46].
-2.  **Encrypted Security Email:** Send an encrypted email to security@universalvtt.org using our PGP key (available on major keyservers) [46].
+We only provide security updates for the current major release pipeline.
 
-Please include the following information in your report [47]:
-*  A detailed description of the vulnerability [47].
-*  A proof-of-concept (PoC) payload, script, or step-by-step instructions to reproduce [47].
-*  The potential impact (e.g., unauthorized asset decryption, signature bypass, denial of service) [47].
-*  Any details regarding your operating environment (browser, hardware pipeline, VTT platform) [47].
+| Version | Supported | Notes                                              |
+| ------- | --------- | -------------------------------------------------- |
+| v2.x.x  | ✅ Yes    | Current active standard and Upgrader platform.     |
+| v1.x.x  | ❌ No     | Legacy standard (Flat JSON). Please upgrade to v2. |
 
 ---
 
-#### 🔒 High-Priority Target Areas
-The UVTT v2 specification implements several security-sensitive boundaries [47]. Security researchers should focus their audits particularly on these sub-systems:
+## 3. Reporting a Vulnerability
 
-##### 1. Zero-Knowledge-Storage (ZKS) Clearinghouse & Revocations
-The ZKS Clearinghouse acts as the decentralized edge authorization plane (running on Cloudflare Workers and KV storage) to resolve decryption keys deterministically for premium assets without exposing raw credentials database records [48].
-*   **Threat Vectors:** Key leakage, bypass of token signatures, timing attacks during authorization handshakes, database injection in seed/revocation management scripts, or failure of the client-side background revocation sync protocol (failure to flush keys from native vaults and RAM when refunded) [48, 172].
+If you discover a security vulnerability within the UVTT v2 Upgrader, the Desktop Pro engine, or the core Specification, **please do not report it on the public GitHub issue tracker.**
 
-##### 2. Cryptographic Asset Integrity (manifest.hash)
-The integrity pipeline relies on the browser's native **Web Crypto API** or backend parsers to compute SHA-256 digests for all files packaged inside `.uvtt2z` or `.uvtt2k` containers, compiled inside the root `manifest.hash` text file [49].
-*   **Threat Vectors:** Bypass of signature verification, SHA-256 preimage/collision attacks allowing silent swapping of vector triggers or asset files, or tampering with the container structure without invalidating the manifest hash index [49].
+Instead, please use the following secure channels:
 
-##### 3. Parser, Decryption, & Volatile Memory Runtimes
-The Go reference parser and TypeScript reference parser implement AES-256-GCM decryption for secure `.uvtt2k` campaign archives [49, 84].
-*   **Threat Vectors:** Initialization Vector (IV) / nonce reuse in AES-GCM decryption [50], prototype pollution, heap/buffer overflows in ZIP extraction [50], or memory leakage of raw decrypted assets in WebGL/WebGPU texture cache due to failure of the **Volatile Memory Disposal Protocol** (e.g., failing to revoke Blob URLs or actively zero-overwrite decrypted ArrayBuffers) [16, 50].
+1. **Email:** Send your report to `[Insert Security Email Address Here]`.
+2. **Template:** Please format your report using the structure defined in our `SECURITY_DISCLOSURE_TEMPLATE.md` file.
+
+**Response Timeline:** We will acknowledge receipt of your vulnerability report within 48 hours and strive to provide a remediation timeline within 7 days.
 
 ---
 
-#### Our Disclosure Process
-We adhere to standard coordinated vulnerability disclosure (CVD) practices [50]:
-1.  **Acknowledgement:** We will acknowledge receipt of your report within **48 hours** and assign a primary security coordinator [50].
-2.  **Triage & Validation:** We will investigate and attempt to reproduce the issue. We aim to complete triage and provide a status update within **7 days** [50].
-3.  **Remediation:** If validated, we will work on a patch. Our goal is to release a security update within **30 days** of validation [50].
-4.  **Advisory:** We will publish a Security Advisory (GHSA / CVE) detailing the vulnerability, crediting you for the discovery (if desired), and providing upgrade instructions for downstream platforms [50].
+## 4. Threat Model and Scope
 
----
+To help security researchers understand our architecture, please review what is (and is not) considered a valid security vulnerability within the UVTT v2 ecosystem.
 
-#### 🛡️ Safe Harbor
-Any research conducted in good faith under this policy is protected by our Safe Harbor agreement [51]. We will not pursue legal action or encourage third parties to pursue legal action against researchers who [51]:
-*  Do not exploit the vulnerability beyond what is strictly necessary to prove its existence [51].
-*  Do not compromise, view, or modify user data or premium creator assets [51].
-*  Provide us a reasonable period to address the issue before making any public disclosure (90-day standard) [51].
-*  Comply with all local, state, and federal laws during their research [51].
+### ✅ In Scope (Valid Vulnerabilities)
+
+- **Zip Bombs / Resource Exhaustion:** A maliciously crafted `.uvtt2z` archive that intentionally causes memory exhaustion or a denial-of-service (DoS) when parsed by the Upgrader.
+- **Arbitrary Code Execution (ACE) / XSS:** A `.uvtt2z` archive containing poisoned JSON fields (e.g., a malicious payload in `manifest.author`) that successfully executes unauthorized JavaScript in the Web SPA or Go backend in the Desktop Pro app.
+- **Path Traversal:** A malicious archive attempting to use relative paths (e.g., `../../etc/passwd`) within the `assets/` directory to read or write files outside the intended sandbox.
+- **Cryptographic Failures:** Flaws in how the Desktop Pro app generates the AES-256-GCM encryption envelope or manages IVs/Salts.
+
+### ❌ Out of Scope (Not Considered Vulnerabilities)
+
+- **Creator Key Leaks:** If a creator accidentally uploads their `.uvtt2k` key file to a public forum alongside their payload, this is user error, not a platform vulnerability.
+- **Browser Sandbox Limits:** The Web SPA Upgrader crashing because a user attempted to load a 4 GB map on a machine with 2 GB of RAM. (This is an OS/Browser limitation; users should upgrade to Desktop Pro for streaming massive files).
+- **Volatile RAM Inspection:** Extracting a decrypted premium map by running a memory debugger (like Cheat Engine) against the VTT client. Once a user legally provides a key, the data must exist in RAM to be rendered by the GPU. Preventing OS-level memory inspection is outside the scope of this cartography standard.

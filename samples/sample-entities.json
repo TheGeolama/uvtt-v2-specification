@@ -143,6 +143,15 @@
     }
   ],
   "audio": {
+    "music": {
+      "uri": "assets/global_combat_theme.ogg",
+      "volume": 0.75,
+      "crossfade_duration": 3.0
+    },
+    "ambience": {
+      "uri": "assets/global_storm_loop.ogg",
+      "volume": 0.4
+    },
     "zones": [
       {
         "id": "acoustic_water_dripping",

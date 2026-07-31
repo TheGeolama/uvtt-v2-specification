@@ -14,6 +14,9 @@
 "spec: entities":
   - any-glob-to-any-file: "schemas/entities.schema.json"
 
+"spec: assets":
+  - any-glob-to-any-file: "schemas/assets.schema.json"
+
 "parser: go":
   - any-glob-to-any-file: "reference-parsers/go/**/*"
 
@@ -27,6 +30,7 @@
   - any-glob-to-any-file:
       - "README.md"
       - "CONTRIBUTING.md"
-      - "UNIVERSAL_VTT_V2_SPEC.md"
+      - "SECURITY.md"
+      - "CHANGELOG.md"
       - "docs/**/*"
       - "RFCs/**/*"
