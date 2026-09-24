@@ -3,7 +3,7 @@
  * File: uvtt2_parser.ts (TypeScript Reference Implementation)
  * 
  * Standards Body: Open Virtual Tabletop Consortium (OVTC)
- * Format Version: 2.0.0 (Final Production Specification)
+ * Format Version: 2.0.0-rc2 (Final Production Specification)
  * 
  * Implements:
  *  1. ZIP Archive Stream Parsing (Standard .uvtt2z and Standalone .uvtt2a packages)
@@ -131,10 +131,7 @@ export interface Portal {
   state: "open" | "closed" | "locked" | "broken";
   height: HeightRange;
   blocks: string[];
-  line: {
-    p1: MapOrigin;
-    p2: MapOrigin;
-  };
+  path: PathNode[]; // 🚨 UPDATED for v2.0.0-rc2
   visibility?: "visible" | "gm_only" | "hidden";
   sync_id?: string;
 }
@@ -253,6 +250,7 @@ export interface AcousticZone {
   volume_max: number;
   audio_uri: string;
   muffled_by_geometry?: boolean;
+  muffling_factor?: number; // 🚨 UPDATED for v2.0.0-rc2
   visibility?: "visible" | "gm_only" | "hidden";
   sync_id?: string;
 }

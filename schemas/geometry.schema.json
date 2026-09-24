@@ -36,10 +36,12 @@
           "additionalProperties": false,
           "properties": {
             "x": {
-              "type": "number"
+              "type": "number",
+              "description": "Continuous 2D Cartesian X coordinate"
             },
             "y": {
-              "type": "number"
+              "type": "number",
+              "description": "Continuous 2D Cartesian Y coordinate"
             }
           }
         },
@@ -293,7 +295,7 @@
               "state",
               "height",
               "blocks",
-              "line"
+              "path"
             ],
             "additionalProperties": false,
             "properties": {
@@ -352,41 +354,72 @@
                   ]
                 }
               },
-              "line": {
-                "type": "object",
-                "required": [
-                  "p1",
-                  "p2"
-                ],
-                "additionalProperties": false,
-                "properties": {
-                  "p1": {
-                    "type": "object",
-                    "required": [
-                      "x",
-                      "y"
-                    ],
-                    "properties": {
-                      "x": {
-                        "type": "number"
-                      },
-                      "y": {
-                        "type": "number"
+              "path": {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "type"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "move",
+                        "line",
+                        "bezier"
+                      ]
+                    },
+                    "x": {
+                      "type": "number"
+                    },
+                    "y": {
+                      "type": "number"
+                    },
+                    "cp1": {
+                      "type": "object",
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
                       }
-                    }
-                  },
-                  "p2": {
-                    "type": "object",
-                    "required": [
-                      "x",
-                      "y"
-                    ],
-                    "properties": {
-                      "x": {
-                        "type": "number"
-                      },
-                      "y": {
-                        "type": "number"
+                    },
+                    "cp2": {
+                      "type": "object",
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "to": {
+                      "type": "object",
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number"
+                        }
                       }
                     }
                   }

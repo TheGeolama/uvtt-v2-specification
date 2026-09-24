@@ -311,6 +311,18 @@ class UVTT2ConformanceChecker:
                     log_error(f"Directional wall '{wall_id}' must define both 'left_to_right' and 'right_to_left' blocks.")
                     return False
 
+        # Validate Portals
+        portals = geometry.get("portals", [])
+        for portal in portals:
+            portal_id = portal.get("id", "unnamed")
+            if "line" in portal:
+                log_error(f"Conformance Error: Portal '{portal_id}' contains deprecated 'line' object instead of 'path'.")
+                return False
+            path = portal.get("path", [])
+            if not path or len(path) < 2:
+                log_error(f"Conformance Error: Portal '{portal_id}' requires a 'path' array with at least 2 nodes.")
+                return False
+
         # Validate Semantic Zones
         zones = geometry.get("zones", [])
         for zone in zones:
@@ -370,6 +382,8 @@ class UVTT2ConformanceChecker:
             zone_id = zone.get("id", "unnamed")
             v_max = zone.get("volume_max", 1.0)
             fade_rad = zone.get("fade_radius", 1.0)
+            muffled = zone.get("muffled_by_geometry", False)
+            muff_factor = zone.get("muffling_factor")
 
             if not (0.0 <= v_max <= 1.0):
                 log_error(f"Volume index overflow on sound zone '{zone_id}': {v_max}. Standard limits: [0.0, 1.0].")
@@ -378,6 +392,14 @@ class UVTT2ConformanceChecker:
             if fade_rad <= 0.0:
                 log_error(f"Localized acoustic zone decay boundary for '{zone_id}' must be positive and non-zero: {fade_rad}")
                 return False
+            
+            if muffled:
+                if muff_factor is None:
+                    log_error(f"Conformance Error: Audio zone '{zone_id}' has muffled_by_geometry=True but is missing 'muffling_factor'.")
+                    return False
+                if not (0.0 <= muff_factor <= 1.0):
+                    log_error(f"Conformance Error: Audio zone '{zone_id}' muffling_factor {muff_factor} is out of bounds (0.0 - 1.0).")
+                    return False
 
         return True
 
@@ -421,7 +443,16 @@ def execute_programmatic_self_test():
                     }
                 }
             ],
-            "portals": [],
+            "portals": [
+                {
+                    "id": "door_mock",
+                    "type": "door",
+                    "state": "closed",
+                    "height": {"bottom": 0.0, "top": 10.0},
+                    "blocks": ["light"],
+                    "path": [{"type": "move", "x": 0.0, "y": 0.0}, {"type": "line", "x": 5.0, "y": 0.0}]
+                }
+            ],
             "zones": [
                 {
                     "id": "zone_mud",
@@ -451,7 +482,16 @@ def execute_programmatic_self_test():
                     "path": [{"type": "move", "x": 0, "y": 0}, {"type": "line", "x": 10, "y": 10}]
                 }
             ],
-            "portals": [],
+            "portals": [
+                {
+                    "id": "door_bad",
+                    "type": "door",
+                    "state": "closed",
+                    "height": {"bottom": 0.0, "top": 10.0},
+                    "blocks": ["light"],
+                    "line": {"p1": {"x": 0, "y": 0}, "p2": {"x": 5, "y": 0}}
+                }
+            ],
             "zones": [
                 {
                     "id": "zone_bad",
@@ -472,7 +512,7 @@ def execute_programmatic_self_test():
         ],
         "audio": {
             "zones": [
-                {"id": "ac1", "shape": "circle", "radius": 50.0, "fade_radius": 20.0, "volume_max": 0.8, "audio_uri": "test.ogg"}
+                {"id": "ac1", "shape": "circle", "radius": 50.0, "fade_radius": 20.0, "volume_max": 0.8, "audio_uri": "test.ogg", "muffled_by_geometry": True, "muffling_factor": 0.5}
             ]
         }
     }
@@ -488,6 +528,20 @@ def execute_programmatic_self_test():
     }
     if checker.validate_entities_schema(failing_entities):
         log_error("Self-Test Failed: Validator missed multi-default landing zone violations.")
+        return False
+        
+    failing_entities_2 = {
+        "landing_zones": [
+            {"id": "lz1", "coordinates": [5.0, 5.0], "is_default": True, "heading_degrees": 90.0}
+        ],
+        "audio": {
+            "zones": [
+                {"id": "ac_bad", "shape": "circle", "fade_radius": 20.0, "audio_uri": "test.ogg", "muffled_by_geometry": True}
+            ]
+        }
+    }
+    if checker.validate_entities_schema(failing_entities_2):
+        log_error("Self-Test Failed: Validator missed muffling_factor constraint violations.")
         return False
 
     log_success("Internal programmatic checks: ALL SCHEMAS CONFORM!")

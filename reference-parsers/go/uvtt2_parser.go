@@ -124,10 +124,7 @@ type Portal struct {
 	State   string      `json:"state"`              // open, closed, locked, broken
 	Height  HeightRange `json:"height"`
 	Blocks  []string    `json:"blocks"`
-	Line    struct {
-		P1 MapOrigin `json:"p1"`
-		P2 MapOrigin `json:"p2"`
-	} `json:"line"`
+	Path    []PathNode  `json:"path"`               // 🚨 UPDATED for v2.0.0-rc2
 	Visibility string `json:"visibility,omitempty"`
 	SyncID     string `json:"sync_id,omitempty"`
 }
@@ -251,6 +248,7 @@ type AcousticZone struct {
 	VolumeMax         float64   `json:"volume_max"`
 	AudioURI          string    `json:"audio_uri"`
 	MuffledByGeometry bool      `json:"muffled_by_geometry,omitempty"`
+	MufflingFactor    *float64  `json:"muffling_factor,omitempty"` // 🚨 UPDATED for v2.0.0-rc2
 	Visibility        string    `json:"visibility,omitempty"`
 	SyncID            string    `json:"sync_id,omitempty"`
 }

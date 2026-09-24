@@ -197,10 +197,10 @@ def create_campaign_archive(output_path: str, drm: bool, key_hex: str):
                         "state": "closed",
                         "height": {"bottom": 0.0, "top": 8.0},
                         "blocks": ["light", "sight", "movement"],
-                        "line": {
-                            "p1": {"x": 5.0 * grid_units - 1.0, "y": 2.0 * grid_units},
-                            "p2": {"x": 5.0 * grid_units + 1.0, "y": 2.0 * grid_units}
-                        }
+                        "path": [
+                            {"type": "move", "x": 5.0 * grid_units - 1.0, "y": 2.0 * grid_units},
+                            {"type": "line", "x": 5.0 * grid_units + 1.0, "y": 2.0 * grid_units}
+                        ]
                     }
                 ],
                 "overhead": [],
@@ -257,7 +257,20 @@ def create_campaign_archive(output_path: str, drm: bool, key_hex: str):
                 }
             ],
             "events": [],
-            "audio": {"zones": []},
+            "audio": {
+                "zones": [
+                    {
+                        "id": f"acoustic_water_{floor['id']}",
+                        "shape": "circle",
+                        "center": {"x": 6.5 * grid_units, "y": 6.5 * grid_units},
+                        "fade_radius": 5.0,
+                        "volume_max": 0.8,
+                        "audio_uri": "assets/sfx_dripping_water.ogg",
+                        "muffled_by_geometry": True,
+                        "muffling_factor": 0.5
+                    }
+                ]
+            },
             "emitters": []
         }
         files_to_hash[f"{path}entities.json"] = json.dumps(
@@ -287,11 +300,19 @@ def create_campaign_archive(output_path: str, drm: bool, key_hex: str):
     manifest_hash_bytes = ("\n".join(hash_lines) + "\n").encode("utf-8")
 
     # 4. Pack into standard unencrypted ZIP buffer
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        # Write manifest.hash first
-        zf.writestr("manifest.hash", manifest_hash_bytes)
+    with zipfile.ZipFile(zip_buffer, "w") as zf:
+        # Write manifest.hash first (uncompressed)
+        zf.writestr("manifest.hash", manifest_hash_bytes, compress_type=zipfile.ZIP_STORED)
+        
         for f_path, data in files_to_hash.items():
-            zf.writestr(f_path, data)
+            ext = os.path.splitext(f_path)[1].lower()
+            # Enforce DEFLATE for JSON, STORE for binary media
+            if ext in [".webp", ".ogg", ".webm", ".enc"]:
+                c_type = zipfile.ZIP_STORED
+            else:
+                c_type = zipfile.ZIP_DEFLATED
+                
+            zf.writestr(f_path, data, compress_type=c_type)
 
     raw_zip_bytes = zip_buffer.getvalue()
 

@@ -563,6 +563,12 @@
               },
               "muffled_by_geometry": {
                 "type": "boolean"
+              },
+              "muffling_factor": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "description": "Explicit attenuation baseline when sound crosses a geometry barrier."
               }
             }
           }
@@ -645,10 +651,6 @@
                     "type": "number"
                   }
                 }
-              },
-              "radius": {
-                "type": "number",
-                "minimum": 0.0
               }
             }
           },
