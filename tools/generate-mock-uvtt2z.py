@@ -203,7 +203,22 @@ def create_campaign_archive(output_path: str, drm: bool, key_hex: str):
                         }
                     }
                 ],
-                "overhead": []
+                "overhead": [],
+                "zones": [
+                    {
+                        "id": f"zone_water_{floor['id']}",
+                        "path": [
+                            {"x": 6.0 * grid_units, "y": 6.0 * grid_units},
+                            {"x": 7.0 * grid_units, "y": 6.0 * grid_units},
+                            {"x": 7.0 * grid_units, "y": 7.0 * grid_units},
+                            {"x": 6.0 * grid_units, "y": 7.0 * grid_units}
+                        ],
+                        "properties": {
+                            "visibility": "gm_only"
+                        },
+                        "traits": ["difficult_terrain", "water"]
+                    }
+                ]
             }
         }
         files_to_hash[f"{path}geometry.json"] = json.dumps(

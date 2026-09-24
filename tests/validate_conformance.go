@@ -28,6 +28,11 @@ type MinimalGeometry struct {
 				Top    float64 `json:"top"`
 			} `json:"height"`
 		} `json:"walls"`
+		Zones []struct {
+			ID     string   `json:"id"`
+			Path   []struct{} `json:"path"`
+			Traits []string `json:"traits"`
+		} `json:"zones"`
 	} `json:"geometry"`
 }
 
@@ -292,6 +297,18 @@ func validateMapFolder(fileMap map[string][]byte, path string) error {
 	for _, wall := range geom.Geometry.Walls {
 		if wall.Height.Bottom > wall.Height.Top {
 			return fmt.Errorf("Z-height conflict on wall '%s' inside %s", wall.ID, geomPath)
+		}
+	}
+
+	for _, zone := range geom.Geometry.Zones {
+		if zone.ID == "" {
+			return fmt.Errorf("semantic zone missing id inside %s", geomPath)
+		}
+		if len(zone.Path) < 3 {
+			return fmt.Errorf("semantic zone '%s' must contain at least 3 points inside %s", zone.ID, geomPath)
+		}
+		if len(zone.Traits) == 0 {
+			return fmt.Errorf("semantic zone '%s' missing traits array inside %s", zone.ID, geomPath)
 		}
 	}
 

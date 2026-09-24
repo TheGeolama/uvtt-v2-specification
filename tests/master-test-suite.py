@@ -10,7 +10,8 @@ Features:
 1. Complete Campaign ZIP Conformance Check & manifest.hash integrity parsing.
 2. Strict geometric checks (height Z-bounds, Right-Hand Rule normals, SVG paths).
 3. Sound-clamping, landing-zone exclusivity, and prediction trigger constraints.
-4. Direct AES-256-GCM envelope decryption using standard raw keys.
+4. Semantic Zone validation for URM movement rulesets.
+5. Direct AES-256-GCM envelope decryption using standard raw keys.
 ======================================================================
 """
 
@@ -310,6 +311,32 @@ class UVTT2ConformanceChecker:
                     log_error(f"Directional wall '{wall_id}' must define both 'left_to_right' and 'right_to_left' blocks.")
                     return False
 
+        # Validate Semantic Zones
+        zones = geometry.get("zones", [])
+        for zone in zones:
+            zone_id = zone.get("id")
+            if not zone_id:
+                log_error("Semantic zone defined without a mandatory 'id'.")
+                return False
+            
+            path = zone.get("path", [])
+            if len(path) < 3:
+                log_error(f"Semantic zone '{zone_id}' must contain at least 3 points to form a polygon.")
+                return False
+            for pt in path:
+                if "x" not in pt or "y" not in pt:
+                    log_error(f"Semantic zone '{zone_id}' contains an invalid coordinate (missing x or y).")
+                    return False
+            
+            traits = zone.get("traits", [])
+            if not isinstance(traits, list) or len(traits) == 0:
+                log_error(f"Semantic zone '{zone_id}' must contain a non-empty 'traits' array of strings.")
+                return False
+            for trait in traits:
+                if not isinstance(trait, str):
+                    log_error(f"Semantic zone '{zone_id}' contains an invalid non-string trait: {trait}")
+                    return False
+
         return True
 
     def validate_entities_schema(self, ent):
@@ -394,7 +421,14 @@ def execute_programmatic_self_test():
                     }
                 }
             ],
-            "portals": []
+            "portals": [],
+            "zones": [
+                {
+                    "id": "zone_mud",
+                    "path": [{"x":0, "y":0}, {"x":5, "y":0}, {"x":5, "y":5}],
+                    "traits": ["difficult_terrain"]
+                }
+            ]
         }
     }
     
@@ -417,11 +451,18 @@ def execute_programmatic_self_test():
                     "path": [{"type": "move", "x": 0, "y": 0}, {"type": "line", "x": 10, "y": 10}]
                 }
             ],
-            "portals": []
+            "portals": [],
+            "zones": [
+                {
+                    "id": "zone_bad",
+                    "path": [{"x":0, "y":0}, {"x":5, "y":0}], 
+                    "traits": [] 
+                }
+            ]
         }
     }
     if checker.validate_geometry_schema(failing_geometry):
-        log_error("Self-Test Failed: Geometrical validator missed a Z-axis height conflict (bottom > top).")
+        log_error("Self-Test Failed: Geometrical validator missed a Z-axis height conflict or invalid zone definition.")
         return False
 
     mock_entities = {

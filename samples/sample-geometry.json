@@ -179,6 +179,35 @@
           "uri": "assets/spire_roof.webp"
         }
       }
+    ],
+    "zones": [
+      {
+        "id": "zone_difficult_terrain_01",
+        "path": [
+          {
+            "x": 10.0,
+            "y": 10.0
+          },
+          {
+            "x": 20.0,
+            "y": 10.0
+          },
+          {
+            "x": 20.0,
+            "y": 20.0
+          },
+          {
+            "x": 10.0,
+            "y": 20.0
+          }
+        ],
+        "properties": {
+          "visibility": "gm_only"
+        },
+        "traits": [
+          "difficult_terrain"
+        ]
+      }
     ]
   }
 }

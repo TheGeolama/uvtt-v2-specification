@@ -40,7 +40,7 @@ jobs:
               with open(schema_path, 'r') as f:
                   schema_data = json.load(f)
               Draft7Validator.check_schema(schema_data)
-          print('SUCCESS: All JSON schemas are syntactically valid Draft-07 meta-schemas!')
+          print('SUCCESS: All JSON schemas (including topological boundaries and Semantic Zones) are syntactically valid Draft-07 meta-schemas!')
           "
 
       - name: Step 2 - Execute Master Conformance Test Suite

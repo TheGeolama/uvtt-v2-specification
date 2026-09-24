@@ -2,7 +2,7 @@
 # ======================================================================
 #             UVTT v2 Workspace - Git Pre-Commit Hook
 # ======================================================================
-# Audits schemas, verticalities, and tests before allowing commits.
+# Audits schemas, verticalities, semantic zones, and tests before allowing commits.
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

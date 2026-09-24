@@ -1,9 +1,9 @@
+---
 # 🗺️ Universal Virtual Tabletop v2 (UVTT v2) Master Changelog
 
 All notable changes to the **Universal Virtual Tabletop v2 Specification** and its official **Reference Upgrader Web App** will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and adheres to Semantic Versioning for specifications.
-
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/?utm_source=gemini) and adheres to Semantic Versioning for specifications.
 ---
 
 ## [2.0.0-rc1] - 2026-07-12
@@ -17,17 +17,17 @@ This release marks the official finalization of the **UVTT v2.0.0-rc1 Specificat
 - **Map Asset Separation (`.uvtt2z`):** Replaced legacy V1 Base64-in-JSON payload structures with a zipped archive layout. By detaching massive, premium binary artwork and audio loops into a dedicated `assets/` subdirectory and keeping structural coordinates in text-based JSON, we eliminate the ~33% Base64 encoding overhead that causes browser Out-Of-Memory (OOM) crashes on 8K assets.
 - **Standalone Asset Packs (`.uvtt2a`):** Introduced a new `assets.schema.json` specification to support smart, drag-and-drop standalone asset archives. Tokens, props, and audio loops can now be bundled with metadata that dictates auto-emitting lights, sound fields, and particle physics upon import.
 - **Modular Sub-manifests:** The package structure is split into highly optimized files:
-  - `manifest.json`: Stores lightweight index metadata, resolution data, and global environment variables to enable millisecond-level map-library catalog scanning without parsing massive coordinate files.
-  - `geometry.json`: Houses system-neutral structural vectors, including walls, portals, and overhead boundaries.
-  - `entities.json`: Collects logic-driven interactive layers, containing lights, teleport triggers, localized audio zones, spawns, and weather emitters.
+- `manifest.json`: Stores lightweight index metadata, resolution data, and global environment variables to enable millisecond-level map-library catalog scanning without parsing massive coordinate files.
+- `geometry.json`: Houses system-neutral structural vectors, including walls, portals, overhead boundaries, and zones.
+- `entities.json`: Collects logic-driven interactive layers, containing lights, teleport triggers, localized audio zones, spawns, and weather emitters.
 
 #### 2. In-Memory Normalized Model (IMNM) Migration Router
 
 - **Bi-Directional Pipeline:** Built a centralized migration router (`UvttMigrationEngine`) to decouple version parsing. Incoming map payloads (Legacy V1 or early V2 variants) are translated upward into a reactive, master in-memory state tree managed via a Svelte store. Outbound exports are then compiled or gracefully down-sampled based on the user's selected engine profile.
 - **Graceful Degradation Protocol:** To prevent backward-compatibility anxiety, when a creator compiles a modern map back down to a legacy V1 `.dd2vtt` structure, the engine:
-  - Mathematically flattens smooth SVG Bezier curves into multi-segment straight-line approximations so older parsers do not fail on unknown syntax.
-  - Safely prunes advanced metadata properties, triggers, height levels, and audio zones.
-  - Embeds an `__uvtt_migration_fallback` tracker in the header to preserve a historical record of the original v2 features should the file be re-imported.
+- Mathematically flattens smooth SVG Bezier curves into multi-segment straight-line approximations so older parsers do not fail on unknown syntax.
+- Safely prunes advanced metadata properties, triggers, height levels, and audio zones.
+- Embeds an `__uvtt_migration_fallback` tracker in the header to preserve a historical record of the original v2 features should the file be re-imported.
 
 #### 3. Dual-File Cryptographic DRM Architecture
 
@@ -52,6 +52,7 @@ This release marks the official finalization of the **UVTT v2.0.0-rc1 Specificat
 - **Shift+Click Multi-Select & Collinear Simplification:** Users can multi-select fragmented segments and merge them into unified paths. The merge action runs **Collinear Simplification**, mathematically deleting redundant `move` commands and intermediate points along a straight vector. This guarantees clean paths with a single Right-Hand direction handle.
 - **Vector Reversal & Normal Flipping:** Added a manual **"Reverse Direction"** button. Because one-way sight and movement blockages are calculated dynamically using the **Right-Hand Rule** (rotating normal vectors 90 degrees clockwise from the coordinate sequence), this tool reverses the index sequence and swaps Bezier control handles to flip normal vectors 180 degrees without breaking geometry.
 - **Automated Curve Smoothing:** Jagged legacy curves composed of dozens of performance-heavy straight segments can now be smoothed. Applying Catmull-Rom math to the merged paths automatically calculates tangent vectors and projects control points, fitting native, lightweight SVG cubic Bezier paths.
+- **Semantic Zones for Zero-Knowledge Movement Validation:** Implemented a new `zones` array inside `geometry.json`. Map authors can now draw custom invisible polygons and assign standardized string traits (e.g., `difficult_terrain`, `hazardous`, `narrative_boundary`). This cleanly decouples the map geometry from mechanical rulesets—the host VTT passes the geometric traits to the URM `.wasm` engine, allowing the engine to adjudicate movement costs locally without the VTT needing to know the system's rules.
 
 ---
 
@@ -91,10 +92,10 @@ This release marks the official finalization of the **UVTT v2.0.0-rc1 Specificat
 - **GPU Particle Shader Mapping:** The schema stores visual configuration variables (intensity, speed, angle, and hexadecimal color tints), allowing client-side graphics cards to run optimized particle simulations natively.
 - **Global Wind-Vector Inheritance:** Introduced a fluid dynamics wind model. Emitters can toggle an `inherit_global` wind vector defined in the root environment manifest, applying a linear scale multiplier. Local steam or chimney smoke can ignore global wind completely ($\text{scale} = 0.0$), while outdoor courtyard rain bends dynamically to match a global blizzard ($\text{scale} = 1.0$).
 - **3D Collision Modes:** Configured advanced physical collision properties for particles:
-  - `none`: Particles render continuously through all objects.
-  - `mask_under_overhead`: Weather is dynamically masked on the GPU if particles fall under active roof layers.
-  - `ground_terminate`: Particles terminate instantly and trigger splashing or pooling shaders when hitting defined floor levels.
-  - `wall_bounce`: Particles physically bounce off standard wall geometry overlapping their height ranges.
+- `none`: Particles render continuously through all objects.
+- `mask_under_overhead`: Weather is dynamically masked on the GPU if particles fall under active roof layers.
+- `ground_terminate`: Particles terminate instantly and trigger splashing or pooling shaders when hitting defined floor levels.
+- `wall_bounce`: Particles physically bounce off standard wall geometry overlapping their height ranges.
 
 #### 4. Overhead Layer Masks (Ceilings and Canopies)
 
@@ -107,3 +108,5 @@ This release marks the official finalization of the **UVTT v2.0.0-rc1 Specificat
 
 - **GitHub Pages CD Pipeline:** Engineered a fully automated GitHub Actions pipeline (`deploy-upgrader.yml`). On pushing to the main branch, a secure runner compiles production assets and deploys static code directly to GitHub's content delivery network.
 - **Dynamic Vite Base Routing:** Standardized a dynamic subfolder routing configuration in `vite.config.js`. It evaluates environment variables, allowing the local dev server to run cleanly at root (`/`) while automatically resolving nested repository URLs on GitHub Pages to prevent strict MIME type errors.
+
+---

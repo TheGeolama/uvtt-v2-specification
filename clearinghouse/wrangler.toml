@@ -1,0 +1,22 @@
+# wrangler.toml - Cloudflare Worker Configuration for UVTT v2 ZKS Clearinghouse
+name = "uvtt2-zks-clearinghouse"
+main = "zks-clearinghouse-worker.js"
+compatibility_date = "2026-07-11"
+
+[vars]
+# Public variables
+KEY_SALT_CHECKSUM_ALGORITHM = "SHA-256"
+
+[[kv_namespaces]]
+binding = "DRM_REVOCATIONS_KV"
+id = "YOUR_PRODUCTION_KV_NAMESPACE_ID"
+preview_id = "YOUR_PREVIEW_KV_NAMESPACE_ID" # Used during wrangler dev
+
+[env.production]
+name = "uvtt2-zks-clearinghouse-prod"
+[[kv_namespaces]]
+binding = "DRM_REVOCATIONS_KV"
+id = "YOUR_PRODUCTION_KV_NAMESPACE_ID"
+
+# Note: RETAILER_MASTER_SECRET must be added as a secret, not a plaintext var:
+# Run: wrangler secret put RETAILER_MASTER_SECRET

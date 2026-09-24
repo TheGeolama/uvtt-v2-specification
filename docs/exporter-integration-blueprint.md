@@ -2,7 +2,8 @@
 
 ## High-Performance Coordinate Compilation, Path Optimization, and ZIP Packaging
 
-**Format Version:** 2.0.0  
+**Format Version:** 2.0.0
+
 **Target Audience:** Mapmaking Tool Authors, CAD/GIS Engineers, and Procedural Generation Developers
 
 ---
@@ -25,9 +26,9 @@ To optimize memory usage and offload complex curve drawing to GPU vector process
 
 Every element in the `geometry.json` array must map to one of three parametric SVG path nodes:
 
-1.  **`"type": "move"`**: Resets the coordinate cursor to starting coordinates $(x, y)$.
-2.  **`"type": "line"`**: Evaluates a linear segment from the active cursor position to target coordinates $(x, y)$.
-3.  **`"type": "bezier"`**: Plots a Parametric Cubic Bézier curve, defined by control points `cp1`, `cp2`, and a final anchor point `to`:
+1. **`"type": "move"`**: Resets the coordinate cursor to starting coordinates $(x, y)$.
+2. **`"type": "line"`**: Evaluates a linear segment from the active cursor position to target coordinates $(x, y)$.
+3. **`"type": "bezier"`**: Plots a Parametric Cubic Bézier curve, defined by control points `cp1`, `cp2`, and a final anchor point `to`:
 
 $$P(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3 \quad \text{where} \quad t \in [0, 1]$$
 
@@ -45,6 +46,30 @@ $$\vec{n}_{\text{right}} = (\Delta y, -\Delta x), \quad \vec{n}_{\text{left}} = 
 
 - **Rule for Exporters:** When a user draws a one-way vision barrier, your exporter must arrange the coordinate drawing sequence so that the target blockage face lines up with the positive clockwise halfspace. If the user swaps the block face direction, the exporter should simply reverse the array indexing sequence and swap the Bézier control handles ($P_1 \leftrightarrow P_2$) to flip normal projections $180^\circ$.
 
+#### C. Semantic Movement Zones
+
+Exporters supporting terrain painting or hazard marking must compile boundaries into the `zones` array inside `geometry.json`. Zones must be serialized as coordinate loops containing generic string traits rather than system-specific math:
+
+```json
+{
+  "zones": [
+    {
+      "id": "zone_quicksand_01",
+      "path": [
+        { "x": 10.0, "y": 10.0 },
+        { "x": 15.0, "y": 10.0 },
+        { "x": 15.0, "y": 15.0 },
+        { "x": 10.0, "y": 15.0 }
+      ],
+      "properties": {
+        "visibility": "gm_only"
+      },
+      "traits": ["difficult_terrain", "hazardous"]
+    }
+  ]
+}
+```
+
 ---
 
 ### 📐 2. Geometric Sanity Gates & Vector Optimizations
@@ -57,12 +82,14 @@ GMs and cartographers frequently place wall vectors by hand. Microscopic coordin
 
 **The Snapping Algorithm:**
 
-1.  Initialize a global vertex index registry for the map.
-2.  Define a constant tolerance $D_{\text{snap}} = 0.05 \text{ map units}$ (grid units/feet/meters).
-3.  For each vector path segment processed, compare the coordinates of its endpoints ($x_{\text{node}}, y_{\text{node}}$) against all existing entries in the registry.
-4.  If the Euclidean distance is within tolerance:
-    $$\sqrt{(x_{\text{node}} - x_{\text{registry}})^2 + (y_{\text{node}} - y_{\text{registry}})^2} \le D_{\text{snap}}$$
-5.  Coerce the active coordinates to match the registry values exactly, mathematically sealing the corner.
+1. Initialize a global vertex index registry for the map.
+2. Define a constant tolerance $D_{\text{snap}} = 0.05 \text{ map units}$ (grid units/feet/meters).
+3. For each vector path segment processed, compare the coordinates of its endpoints ($x_{\text{node}}, y_{\text{node}}$) against all existing entries in the registry.
+4. If the Euclidean distance is within tolerance:
+
+$$\sqrt{(x_{\text{node}} - x_{\text{registry}})^2 + (y_{\text{node}} - y_{\text{registry}})^2} \le D_{\text{snap}}$$
+
+5. Coerce the active coordinates to match the registry values exactly, mathematically sealing the corner.
 
 #### B. Collinear Path Simplification
 
@@ -93,7 +120,7 @@ my-compound-archive.uvtt2z/    # Root Archive Container ZIP
 └── maps/                      # Isolated campaign directory
     ├── ground-floor/          # Slugified folder name for first floor
     │   ├── manifest.json      # Local level metrics
-    │   ├── geometry.json      # Local SVG geometries
+    │   ├── geometry.json      # Local SVG geometries (walls, portals, zones)
     │   ├── entities.json      # Local interactive triggers (lights, audio, weather)
     │   ├── map.webp           # Full-fidelity premium image
     │   └── basemap.webp       # Capped 50px-grid watermarked fallback image
@@ -103,11 +130,13 @@ my-compound-archive.uvtt2z/    # Root Archive Container ZIP
         ├── entities.json
         ├── map.webp
         └── basemap.webp
+
 ```
 
 #### B. Strict Path Slugification
 
 To prevent cross-operating system file pathing bugs and URI parsing failures inside VTT engines, all nested directories must be strictly slugified using the official standard:
+
 $$\text{Slugify}(S) = \text{RegExReplace}\left(\text{Lower}(S), \text{"/[^a-z0-9]+/g"}, \text{"-"} \right)$$
 
 #### C. Local URI Rewriting Protocol
@@ -125,26 +154,30 @@ To protect your software platform and premium creators from unauthorized asset m
 
 #### The `manifest.hash` Engine
 
-1.  **Iterate and Digest:** Immediately following the compression of all unencrypted layout and binary files, your exporter must iterate through the ZIP entries, computing the cryptographic **SHA-256 hash** of every individual file byte array.
-2.  **Order and Write:** Write the computed hashes into a flat, newline-separated text file named **`manifest.hash`** at the root of the archive.
-3.  **Format Mapping:** Lines must use the standard dual-space formatting:
-    ```text
-    SHA-256_Checksum  File_Path
-    ```
-    _Sample Receipt Layout:_
-    ```text
-    1a812b5f4c4683e1985f698ef0ac87715335aad4866af8da293d2754ff127d94  manifest.json
-    7f0c9b7eadb0727e1a1d5761afded97a476e4de6eec7efa2c024a6db2c88c348  maps/cellar/geometry.json
-    048f056bd417dbd334c6570ae7a7eb5591e43163a2c684d5bc7ba2cdabdcce2b  maps/cellar/map.webp
-    ```
-4.  **Save in Root:** Save the compiled `manifest.hash` in the archive root directory. Client VTT importers will calculate local digests and reject the entire archive if any files mismatch, securing the platform from code injection exploits.
+1. **Iterate and Digest:** Immediately following the compression of all unencrypted layout and binary files, your exporter must iterate through the ZIP entries, computing the cryptographic **SHA-256 hash** of every individual file byte array.
+2. **Order and Write:** Write the computed hashes into a flat, newline-separated text file named **`manifest.hash`** at the root of the archive.
+3. **Format Mapping:** Lines must use the standard dual-space formatting:
+
+```text
+SHA-256_Checksum  File_Path
+
+```
+
+_Sample Receipt Layout:_
+
+```text
+1a812b5f4c4683e1985f698ef0ac87715335aad4866af8da293d2754ff127d94  manifest.json
+7f0c9b7eadb0727e1a1d5761afded97a476e4de6eec7efa2c024a6db2c88c348  maps/cellar/geometry.json
+048f056bd417dbd334c6570ae7a7eb5591e43163a2c684d5bc7ba2cdabdcce2b  maps/cellar/map.webp
+
+```
+
+4. **Save in Root:** Save the compiled `manifest.hash` in the archive root directory. Client VTT importers will calculate local digests and reject the entire archive if any files mismatch, securing the platform from code injection exploits.
 
 #### Dual-File DRM Delivery (`.uvtt2z` + `.uvtt2k`)
 
 If your exporter supports premium storefront protections, you must generate a randomized 256-bit AES-GCM key per package.
 
-1.  Encrypt the target premium binaries (or the entire zip buffer) using standard AES-256-GCM.
-2.  Save the encrypted package as the `.uvtt2z` payload file.
-3.  Save the 64-character hexadecimal representation of the AES key inside a plaintext `.uvtt2k` file to be delivered to the end-user via a separate fulfillment channel.
-
-By integrating these precision geometric cleanups, SVG curves, localized compound directories, and hash validation signatures directly into your export engine, you guarantee your software exports the most secure, responsive, and performance-optimized campaign maps in the TTRPG industry!
+1. Encrypt the target premium binaries (or the entire zip buffer) using standard AES-256-GCM.
+2. Save the encrypted package as the `.uvtt2z` payload file.
+3. Save the 64-character hexadecimal representation of the AES key inside a plaintext `.uvtt2k` file to be delivered to the end-user via a separate fulfillment channel.An audit of your `./docs/` folder reveals several duplicate and obsolete drafts that were created during earlier design phases.
