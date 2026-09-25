@@ -4,6 +4,11 @@ theme: jekyll-theme-cayman
 exclude:
   - tests/
   - schemas/
+  - tools/
+  - samples/
+  - utilities/
+  - clearinghouse/
+  - RFCs/
   - reference-parsers/
   - mock_data/
   - userdata/
