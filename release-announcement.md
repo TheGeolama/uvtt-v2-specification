@@ -35,25 +35,27 @@ To carry your entire legacy map catalog cleanly into the future, we’ve built t
 
 - **Hardware-Accelerated WebGPU Renderer:** The upgrader viewport has migrated natively to **PixiJS v8 and WebGPU**. This reduces CPU/GPU overhead drastically when executing massive coordinate maps, real-time lighting arcs, and dense particle effects.
 - **3D Point & Directional Lights:** Customize rich light setups featuring custom hex colors, pulse/flicker animation states, and realistic **Inverse-Square Decay physics**:
+  ```text
+  Intensity = Initial_Intensity / (distance * distance)
+  ```
 
-$$I = \frac{I_0}{d^2}$$
-
-- **Three-Tier Audio & Localized Acoustic Zones:** Map proximity-based 3D audio triggers with customizable fade radii ($r$). Proximity damping calculations are mathematically clamped to prevent negative volume bounds or sudden audio pops:
-
-$$V = \max\left(0, \min\left(V_{\text{max}}, V_{\text{max}} \times \left(1 - \frac{d}{r}\right)\right)\right)$$
-
-Add `muffled_by_geometry: true` to dynamically muffle sound loops when standard walls or closed portals intersect the listener's line of sight.
+- **Three-Tier Audio & Localized Acoustic Zones:** Map proximity-based 3D audio triggers with customizable fade radii. Proximity damping calculations are mathematically clamped to prevent negative volume bounds or sudden audio pops:
+  ```text
+  Volume = max(0, min(Volume_max, Volume_max * (1 - (distance / fade_radius))))
+  ```
+  Add `muffled_by_geometry: true` to dynamically muffle sound loops when standard walls or closed portals intersect the listener's line of sight.
 
 - **Atmospheric Weather Emitters:** Draw custom particle zones (rain, snow, fog, embers, magic) with adjustable speed, intensity, and direction. Emitters can blanket the entire canvas automatically using `is_global: true`, rendering above ceilings or on the ground via explicit `render_layer` parameters (`above_overhead`, `below_overhead`, `ground_level`).
-- **Global Wind-Vector Inheritance:** Emitters can inherit and blend dynamically with global map-wide wind settings. The final particle velocity vector $\vec{v}_{\text{particle}}$ is calculated mathematically as:
-
-$$\vec{v}_{\text{particle}} = \vec{v}_{\text{emitter\_base}} + \left(\text{influence\_scale} \times \vec{v}_{\text{global\_wind}}\right)$$
+- **Global Wind-Vector Inheritance:** Emitters can inherit and blend dynamically with global map-wide wind settings. The final particle velocity vector is calculated mathematically as:
+  ```text
+  Final_Velocity = Base_Velocity + (Influence_Scale * Global_Wind_Velocity)
+  ```
 
 - **3D Collision Height Controls (`collision_mode`):** Define vertical Z-axis boundaries for weather events and overhead roof layers. Emitters support four advanced collision behaviors:
-- `none`: Particles render continuously through all objects.
-- `mask_under_overhead`: Weather is dynamically masked on the GPU if particles fall under active roof layers.
-- `ground_terminate`: Particles terminate instantly and trigger splash/pooling shaders upon hitting defined floor planes.
-- `wall_bounce`: Particles physically bounce off standard wall geometry overlapping their height ranges.
+  - `none`: Particles render continuously through all objects.
+  - `mask_under_overhead`: Weather is dynamically masked on the GPU if particles fall under active roof layers.
+  - `ground_terminate`: Particles terminate instantly and trigger splash/pooling shaders upon hitting defined floor planes.
+  - `wall_bounce`: Particles physically bounce off standard wall geometry overlapping their height ranges.
 
 ---
 
