@@ -262,7 +262,11 @@ This is a flat, newline-separated index mapping every file path in the ZIP archi
 
 ### 6.3. Zero-Knowledge Serverless Edge Clearinghouse (ZKS)
 
-The licensing authority server **never** stores raw symmetric keys in a persistent database. Instead, when a purchase entitlement is verified via JWT/OAuth token verification, the serverless edge worker derives the AES-256 decryption key dynamically in volatile CPU memory using a secure HMAC-SHA256 calculation based on a locally-held master secret, the product SKU, and the file's random key salt. Because key resolution is entirely deterministic and requires no persistent database queries, the ZKS clearinghouse can run inside Cloudflare Workers or serverless edge micro-containers, handling millions of high-concurrency requests with zero database overhead.
+The licensing authority server **never** stores raw symmetric keys in a persistent database. Instead, when a purchase entitlement is verified via JWT/OAuth token verification, the serverless edge worker derives the AES-256 decryption key dynamically in volatile CPU memory using a secure HMAC-SHA256 calculation based on a locally-held master secret, the product SKU, and the file's random key salt:
+
+```text
+Derived_Key = HMAC-SHA256(Master_Secret, SKU + Salt)
+```
 
 ---
 
