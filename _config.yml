@@ -3,6 +3,7 @@ theme: jekyll-theme-cayman
 # Tell Jekyll to explicitly ignore these folders so they don't crash the build
 exclude:
   - tests/
+  - docs/
   - schemas/
   - tools/
   - samples/
