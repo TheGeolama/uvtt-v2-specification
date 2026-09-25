@@ -155,9 +155,9 @@ To remain strictly compliant with the **UVTT v2 DRM Subsystem Specification**, s
 ### 3.1. Zero-Knowledge-Storage (ZKS) Key Derivation
 The storefront server **must never** store the derived decryption keys in a database. Instead, the symmetric encryption key is calculated entirely in volatile, temporary CPU memory on-demand using standard HMAC-SHA256 calculations based on a secure, locally-held master secret:
 
-$$K_{\text{derive}} = \text{HMAC-SHA256}(S_{\text{master}}, \text{SKU} + \text{Salt})$$
-
-This derived key is then used to initialize the `AES-256-GCM` encryption cipher. The key itself is instantly flushed from the server's heap memory once the compression stream finishes, eliminating database-compromise vulnerabilities.
+```text
+Derived_Key = HMAC-SHA256(Master_Secret, SKU + Salt)
+```
 
 ### 3.2. Split-Resolution Processing
 The API must dynamically scale down and watermark the high-resolution source map to compile the unencrypted public fallback image:
