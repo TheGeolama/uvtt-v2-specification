@@ -1,9 +1,9 @@
----
 # 🗺️ Universal Virtual Tabletop v2 (UVTT v2) Master Changelog
 
 All notable changes to the **Universal Virtual Tabletop v2 Specification** and its official **Reference Upgrader Web App** will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/?utm_source=gemini) and adheres to Semantic Versioning for specifications.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and adheres to Semantic Versioning for specifications.
+
 ---
 
 ## [2.0.0-rc1] - 2026-07-12
