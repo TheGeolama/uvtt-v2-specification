@@ -12,13 +12,12 @@ Unlike legacy V1 formats that stuffed 8K Base64-encoded images straight into sin
 
 Unzip the archive to reveal the following standard directory mapping:
 
-```directory
+```text
 map_package.uvtt2z/ (ZIP Root)
 ├── manifest.json            # Global metadata, grid resolution, and global audio
 ├── geometry.json            # Vector lines-of-sight, walls, zones, and overhead roof boundaries
 ├── entities.json            # Dynamic lights, teleport triggers, audio zones, and emitters
 └── assets/                  # Binary folder (basemap webp, spatial audio oggs, textures)
-
 ```
 
 ---
@@ -185,5 +184,3 @@ Before serving assets:
 ---
 
 _Now go build! Your platform's users are waiting for the performance and immersive world-building of UVTT v2._
-
----
